@@ -70,3 +70,6 @@ In a multi-core environment, Java’s multithreading can take full advantage of 
 The JVM can distribute threads across multiple cores, allowing true parallel execution of threads.
 
 A thread is a lightweight process, the smallest unit of processing. Java supports multithreading through its java.lang.Thread class and the java.lang.Runnable interface
+
+- https://engineeringdigest.medium.com/multithreading-in-java-39f34724bbf6
+- https://www.programiz.com/java-programming/lambda-expression
