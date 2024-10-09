@@ -18,11 +18,11 @@ Three core interfaces:
 An Executor Framework in Java is part of the java.util.concurrent package and provides a high-level mechanism for managing threads and asynchronous task execution. Instead of manually managing thread creation, the framework allows developers to focus on task submission and management, making concurrency more manageable.
 
 # Key Components:
-Executor: The base interface with a single method execute(Runnable command). It allows task execution in a separate thread.
-ExecutorService: A more advanced subinterface of Executor, which includes lifecycle management methods (e.g., shutting down the executor) and supports both Runnable and Callable tasks.
-ScheduledExecutorService: A specialized version of ExecutorService that supports scheduling tasks to run after a delay or at regular intervals.
-ThreadPoolExecutor: The most commonly used implementation that manages a pool of worker threads for concurrent task execution.
-ForkJoinPool: A framework for parallelism, ideal for dividing tasks into smaller tasks (fork) and combining their results (join).
+- **Executor** : The base interface with a single method execute(Runnable command). It allows task execution in a separate thread.
+- **ExecutorService**: A more advanced subinterface of Executor, which includes lifecycle management methods (e.g., shutting down the executor) and supports both Runnable and Callable tasks.
+- ScheduledExecutorService: A specialized version of ExecutorService that supports scheduling tasks to run after a delay or at regular intervals.
+- ThreadPoolExecutor: The most commonly used implementation that manages a pool of worker threads for concurrent task execution.
+- ForkJoinPool: A framework for parallelism, ideal for dividing tasks into smaller tasks (fork) and combining their results (join).
 Important Methods:
 execute(Runnable command): Executes a task asynchronously in a separate thread.
 
@@ -45,3 +45,7 @@ Thread Pool Management: Handles thread pool creation, reuse, and shutdown effici
 Task Lifecycle Management: Simplifies handling tasks' life cycles, such as submitting, executing, waiting for completion, and shutting down.
 Concurrency Control: Provides built-in mechanisms to control task execution, scheduling, and parallelism.
 By using the Executor Framework, developers can write highly concurrent programs more easily, improving resource management and performance.
+
+
+# Future in java
+https://www.geeksforgeeks.org/future-and-futuretask-in-java/
