@@ -3,5 +3,8 @@ include 'Multithreading'
 include 'Springboot'
 include 'Springboot:Springboot-basic-app'
 findProject(':Springboot:Springboot-basic-app')?.name = 'Springboot-basic-app'
+include 'Springboot:SpringbootInterviewEssential'
+findProject(':Springboot:SpringbootInterviewEssential')?.name = 'SpringbootInterviewEssential'
+
 
 

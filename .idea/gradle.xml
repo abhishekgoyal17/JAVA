@@ -11,6 +11,7 @@
             <option value="$PROJECT_DIR$/Multithreading" />
             <option value="$PROJECT_DIR$/Springboot" />
             <option value="$PROJECT_DIR$/Springboot/Springboot-basic-app" />
+            <option value="$PROJECT_DIR$/Springboot/SpringbootInterviewEssential" />
           </set>
         </option>
       </GradleProjectSettings>
