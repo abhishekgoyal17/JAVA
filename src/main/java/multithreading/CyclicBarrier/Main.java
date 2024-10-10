@@ -10,7 +10,7 @@ public class Main {
         CyclicBarrier barrier = new CyclicBarrier(numberOfSubsystems, new Runnable() {
             @Override
             public void run() {
-                System.out.println("All subsystems are up and running. System startup complete.");
+                System.out.println("All subsystems are up and running. System starttup complete.");
             }
         });
 
