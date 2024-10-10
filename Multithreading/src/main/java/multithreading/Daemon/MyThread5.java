@@ -1,4 +1,4 @@
-package multithreading.Daemon;
+package Multithreading.multithreading.Daemon;
 
 public class MyThread5 extends Thread {
     @Override
