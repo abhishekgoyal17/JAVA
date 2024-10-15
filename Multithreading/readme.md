@@ -66,5 +66,16 @@ Multithreading in Java is an essential concept for building efficient, high-perf
 
 ## References
 - [Article on Multithreading](https://engineeringdigest.medium.com/multithreading-in-java-39f34724bbf6)
--  [Intevriew QUestions](https://medium.com/@chandantechie/tricky-java-multithreading-interview-question-and-answer-with-examples-79e420ab4a46)
+-  [Inteview QUestions](https://medium.com/@chandantechie/tricky-java-multithreading-interview-question-and-answer-with-examples-79e420ab4a46)
+## Shrayansh- jain notes
+- [Part 1](https://notebook.zohopublic.in/public/notes/74tdo52a4834de5554f09bc9ec3f11572cd11)
+- [Part 2](https://notebook.zohopublic.in/public/notes/74tdo47dcfcf05e644cf192c411a6d78ec1dc)
+- [Thread Joining, Daemon Thread, Thread Priority](https://notebook.zohopublic.in/public/notes/74tdob1b1f9bf584f44228974656f4d93519d)
+- [Lock and Condition](https://notebook.zohopublic.in/public/notes/74tdo36e9543c1b8941ea9099d9f04b190404)
+- [Lock free concurrency](https://notebook.zohopublic.in/public/notes/74tdof6d5236d9b234442a814277c786bc6a2)
+- [Threapool and Executor](https://notebook.zohopublic.in/public/notes/74tdo0e297bb7d6dd4d45a837d13f60fedc3f)
+- [Future, CompletableFuture and Callable](https://notebook.zohopublic.in/public/notes/74tdo4a0bd722efc748d0909fbb498fa21b18)
+- [Java : ScheduledThreadPoolExecutor](https://notebook.zohopublic.in/public/notes/74tdo985cdf57a9bc40bdb37a4468a09b9554)
+- [Java - Fork/Join Pool, Single, Fixed, CachedPool](https://notebook.zohopublic.in/public/notes/74tdo77c24fe4d4df41c582e9041230f2cd6e)
+- [Java: VirtualThreads and ThreadLoca](https://notebook.zohopublic.in/public/notes/74tdo3074d38916474ae096fe57ad9f2ff54b)
 
