@@ -3,8 +3,10 @@ package Multithreading.multithreading.Daemon;
 public class MyThread5 extends Thread {
     @Override
     public void run() {
-       while(true){
+        int i=100;
+       while(i!=0){
            System.out.println("Hello world");
+           i--;
        }
     }
 
@@ -21,3 +23,5 @@ public class MyThread5 extends Thread {
 
 //DAEMON THREADS
 //jvm doesnot wait for daemon
+
+// daemons example: Logging, Garbage collector
