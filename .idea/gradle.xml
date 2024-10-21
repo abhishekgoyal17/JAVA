@@ -8,6 +8,8 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/LowLevelDesign" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/Splitwise" />
             <option value="$PROJECT_DIR$/Multithreading" />
             <option value="$PROJECT_DIR$/Springboot" />
             <option value="$PROJECT_DIR$/Springboot/Springboot-basic-app" />
