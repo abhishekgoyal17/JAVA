@@ -9,11 +9,18 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/LowLevelDesign" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/BookmyShow" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/GoogleDrive" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/LLDTicTacToe" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/SnakeAndLadder" />
             <option value="$PROJECT_DIR$/LowLevelDesign/Splitwise" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/TicTacToe" />
+            <option value="$PROJECT_DIR$/LowLevelDesign/VendingMachine" />
             <option value="$PROJECT_DIR$/Multithreading" />
             <option value="$PROJECT_DIR$/Springboot" />
             <option value="$PROJECT_DIR$/Springboot/Springboot-basic-app" />
             <option value="$PROJECT_DIR$/Springboot/SpringbootInterviewEssential" />
+            <option value="$PROJECT_DIR$/Springboot/UrlShortner" />
           </set>
         </option>
       </GradleProjectSettings>

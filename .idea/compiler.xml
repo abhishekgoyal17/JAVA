@@ -9,8 +9,15 @@
         </processorPath>
         <module name="interview.Springboot.Springboot-basic-app.main" />
         <module name="interview.Springboot.SpringbootInterviewEssential.main" />
+        <module name="interview.Springboot.UrlShortner.main" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="17" />
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="interview.LowLevelDesign.LLDTicTacToe.main" options="--add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED" />
+      <module name="interview.LowLevelDesign.TicTacToe.main" options="--add-exports jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED,ALL-UNNAMED" />
+    </option>
   </component>
 </project>

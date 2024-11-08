@@ -12,7 +12,7 @@ This project is an implementation of a simplified **Splitwise**-like system usin
     - [Command Pattern](#command-pattern)
     - [Facade Pattern](#facade-pattern)
 - [Classes and Responsibilities](#classes-and-responsibilities)
-    - [User and UserManager](#user-and-usermanager)
+    - [command.User and UserManager](#user-and-usermanager)
     - [Expense Classes](#expense-classes)
     - [Split Strategies](#split-strategies)
     - [Expense Command](#expense-command)
@@ -55,8 +55,8 @@ This project allows users to:
 
 ## Classes and Responsibilities
 
-### User and UserManager
-- **`User`**: Represents a user with `userId` and `name`.
+### command.User and UserManager
+- **`command.User`**: Represents a user with `userId` and `name`.
 - **`UserManager`**: Singleton class that manages users using a `HashMap` for quick access.
 
 ### Expense Classes
