@@ -24,4 +24,6 @@ include 'LowLevelDesign:TicTacToe'
 findProject(':LowLevelDesign:TicTacToe')?.name = 'TicTacToe'
 include 'LowLevelDesign:SnakeAndLadder'
 findProject(':LowLevelDesign:SnakeAndLadder')?.name = 'SnakeAndLadder'
+include 'LowLevelDesign:Cache'
+findProject(':LowLevelDesign:Cache')?.name = 'Cache'
 
