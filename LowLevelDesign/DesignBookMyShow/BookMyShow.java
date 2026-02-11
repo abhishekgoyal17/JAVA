@@ -1,199 +1,207 @@
+/**
+ * Main application class for the BookMyShow low-level design simulation.
+ * <p>
+ * This file initializes movies, theatres, screens, shows, and users
+ * to simulate the booking experience of a movie ticket system.
+ * <br>
+ * All interactions related to a sample user booking are demonstrated in the userFlow method.
+ * </p>
+ * 
+ * @author (Auto-generated JavaDoc)
+ */
 package LowLevelDesign.DesignBookMyShow;
 
+import LowLevelDesign.DesignBookMyShow.Controllers.BookingController;
+import LowLevelDesign.DesignBookMyShow.Controllers.TheatreController;
+import LowLevelDesign.DesignBookMyShow.entities.*;
 import LowLevelDesign.DesignBookMyShow.Enums.City;
 import LowLevelDesign.DesignBookMyShow.Enums.SeatCategory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.*;
 
-public class BookMyShow {
+/**
+ * BookMyShowApp is responsible for system startup, initialization,
+ * and orchestrating the user booking flow for the sample "BookMyShow" low-level design.
+ */
+public class BookMyShowApp {
 
-    MovieController movieController;
-    TheatreController theatreController;
+    private TheatreController theatreController;
+    private BookingController bookingController;
 
-    BookMyShow() {
-        movieController = new MovieController();
+    /**
+     * Main entry point for the BookMyShow application.
+     * <p>
+     * Initializes the application and performs a sample user booking flow end-to-end.
+     *
+     * @param args Command-line arguments (not used)
+     */
+    public static void main(String[] args) {
+        BookMyShowApp app = new BookMyShowApp();
+        app.initialize();
+        app.userFlow();
+    }
+
+
+    /**
+     * Initializes controllers and populates initial data for movies, theatres, screens, and shows.
+     */
+    private void initialize() {
         theatreController = new TheatreController();
+        bookingController = new BookingController();
+
+
+        /*
+         * 1. Create Movies
+         */
+        Movie baahubali = new Movie("BAAHUBALI");
+        Movie avengers = new Movie("AVENGERS");
+
+
+        /*
+         * 2. Create Theatre -> Screen -> Seats
+         */
+        Screen inoxScreen1 = new Screen(1, createSeats());
+        Theatre inoxTheatreBangalore = new Theatre(
+                "INOX",
+                City.BANGALORE,
+                List.of(inoxScreen1)
+        );
+
+        Screen pvrScreen1 = new Screen(1, createSeats());
+        Theatre pvrTheatreDelhi = new Theatre(
+                "PVR",
+                City.DELHI,
+                List.of(pvrScreen1)
+        );
+
+        theatreController.addTheatre(inoxTheatreBangalore);
+        theatreController.addTheatre(pvrTheatreDelhi);
+
+
+        /*
+         * 3. Create Shows
+         */
+        Show inoxMorningShowToday = new Show(
+                baahubali,
+                inoxScreen1,
+                LocalDate.now(),
+                LocalTime.of(8, 0)
+        );
+
+        Show inoxAfternoonShowToday = new Show(
+                baahubali,
+                inoxScreen1,
+                LocalDate.now(),
+                LocalTime.of(15, 0)
+        );
+
+        Show inoxEveningShowToday = new Show(
+                avengers,
+                inoxScreen1,
+                LocalDate.now(),
+                LocalTime.of(18, 0)
+        );
+
+
+        Show pvrMorningShowTomorrow = new Show(
+                baahubali,
+                pvrScreen1,
+                LocalDate.now().plusDays(1),
+                LocalTime.of(9, 0)
+        );
+
+
+        // Attach shows to screens
+        inoxScreen1.addShow(inoxMorningShowToday);
+        inoxScreen1.addShow(inoxAfternoonShowToday);
+        inoxScreen1.addShow(inoxEveningShowToday);
+        pvrScreen1.addShow(pvrMorningShowTomorrow);
     }
 
+    /**
+     * Simulates the complete user journey of booking a ticket in the system.
+     * <p>
+     * The flow covers login, city selection, movie selection, theatre and time selection,
+     * seat selection, and booking confirmation with payment.
+     */
+    private void userFlow() {
 
-    public static void main(String args[]) {
+        // User enters system
+        User user = new User("U1", "Shrayansh");
 
-        BookMyShow bookMyShow = new BookMyShow();
+        System.out.println("User logged in: Shrayansh");
 
-        bookMyShow.initialize();
+        // 1. User selects city
+        City selectedCity = City.BANGALORE;
+        System.out.println("Selected City: " + selectedCity);
 
-        //user1
-        bookMyShow.createBooking(City.Bangalore, "BAAHUBALI");
-        //user2
-        bookMyShow.createBooking(City.Bangalore, "BAAHUBALI");
+        // 2. for specific date, Show movies running in city
+        LocalDate selectedDate = LocalDate.now();
+        System.out.println("Selected Date: " + selectedDate);
 
-    }
+        Set<Movie> movies = theatreController.getMovies(selectedCity, selectedDate);
+        System.out.println("Movies available:");
+        movies.forEach(m -> System.out.println(" - " + m.getName()));
 
-    private void createBooking(City userCity, String movieName) {
+        // 3. User selects movie
+        Movie selectedMovie = movies.iterator().next(); //selecting first movie
+        System.out.println("Selected Movie: " + selectedMovie.getName());
 
 
-        //1. search movie by my location
-        List<Movie> movies = movieController.getMoviesByCity(userCity);
+        // 4. Show theatres and show times in city
+        List<Theatre> theatres = theatreController.getTheatres(selectedCity, selectedMovie, selectedDate);
+        System.out.println("Theatres available:");
+        theatres.forEach(t -> System.out.println(" - " + t.getName()));
 
-        //2. select the movie which you want to see. i want to see Baahubali
-        Movie interestedMovie = null;
-        for (Movie movie : movies) {
+        // 6. User selects theatre
+        Theatre selectedTheatre = theatres.get(0);
+        System.out.println("Selected Theatre: " + selectedTheatre.getName());
 
-            if ((movie.getMovieName()).equals(movieName)) {
-                interestedMovie = movie;
-            }
-        }
+        // 7. Show running shows for movie + date + theatre
+        List<Show> shows =
+                theatreController.getShows(
+                        selectedMovie,
+                        selectedDate,
+                        selectedTheatre
+                );
 
-        //3. get all show of this movie in Bangalore location
-        Map<Theatre, List<Show>> showsTheatreWise = theatreController.getAllShow(interestedMovie, userCity);
+        System.out.println("Shows available:");
+        shows.forEach(s ->
+                System.out.println(" - " + s.getStartTime())
+        );
 
-        //4. select the particular show user is interested in
-        Map.Entry<Theatre,List<Show>> entry = showsTheatreWise.entrySet().iterator().next();
-        List<Show> runningShows = entry.getValue();
-        Show interestedShow = runningShows.get(0);
+        // 8. User selects show
+        Show selectedShow = shows.get(0);
+        System.out.println("Selected Show Time: " + selectedShow.getStartTime());
 
-        //5. select the seat
-        int seatNumber = 30;
-        List<Integer> bookedSeats = interestedShow.getBookedSeatIds();
-        if(!bookedSeats.contains(seatNumber)){
-            bookedSeats.add(seatNumber);
-            //startPayment
-            Booking booking = new Booking();
-            List<Seat> myBookedSeats = new ArrayList<>();
-            for(Seat screenSeat : interestedShow.getScreen().getSeats()) {
-                if(screenSeat.getSeatId() == seatNumber) {
-                    myBookedSeats.add(screenSeat);
-                }
-            }
-            booking.setBookedSeats(myBookedSeats);
-            booking.setShow(interestedShow);
-        } else {
-            //throw exception
-            System.out.println("seat already booked, try again");
-            return;
-        }
+        // 9. User selects seats
+        List<Integer> selectedSeats = List.of(1, 2, 3);
+        System.out.println("Selected Seats: " + selectedSeats);
+
+        // 10. Booking + Payment
+        Booking booking =
+                bookingController.createBooking(
+                        user,
+                        selectedShow,
+                        selectedSeats
+                );
 
         System.out.println("BOOKING SUCCESSFUL");
+        System.out.println("Booking ID: " + booking.getBookingId());
     }
 
-    private void initialize() {
-
-        //create movies
-        createMovies();
-
-        //create theater with screens, seats and shows
-        createTheatre();
-    }
-
-    //creating 2 theatre
-    private void createTheatre() {
-
-        Movie avengerMovie = movieController.getMovieByName("AVENGERS");
-        Movie baahubali = movieController.getMovieByName("BAAHUBALI");
-
-        Theatre inoxTheatre = new Theatre();
-        inoxTheatre.setTheatreId(1);
-        inoxTheatre.setScreen(createScreen());
-        inoxTheatre.setCity(City.Bangalore);
-        List<Show> inoxShows = new ArrayList<>();
-        Show inoxMorningShow = createShows(1, inoxTheatre.getScreen().get(0), avengerMovie, 8);
-        Show inoxEveningShow = createShows(2, inoxTheatre.getScreen().get(0), baahubali, 16);
-        inoxShows.add(inoxMorningShow);
-        inoxShows.add(inoxEveningShow);
-        inoxTheatre.setShows(inoxShows);
-
-
-        Theatre pvrTheatre = new Theatre();
-        pvrTheatre.setTheatreId(2);
-        pvrTheatre.setScreen(createScreen());
-        pvrTheatre.setCity(City.Delhi);
-        List<Show> pvrShows = new ArrayList<>();
-        Show pvrMorningShow = createShows(3, pvrTheatre.getScreen().get(0), avengerMovie, 13);
-        Show pvrEveningShow = createShows(4, pvrTheatre.getScreen().get(0), baahubali, 20);
-        pvrShows.add(pvrMorningShow);
-        pvrShows.add(pvrEveningShow);
-        pvrTheatre.setShows(pvrShows);
-
-        theatreController.addTheatre(inoxTheatre, City.Bangalore);
-        theatreController.addTheatre(pvrTheatre, City.Delhi);
-
-    }
-
-    private List<Screen> createScreen() {
-
-        List<Screen> screens = new ArrayList<>();
-        Screen screen1 = new Screen();
-        screen1.setScreenId(1);
-        screen1.setSeats(createSeats());
-        screens.add(screen1);
-
-        return screens;
-    }
-
-    private Show createShows(int showId, Screen screen, Movie movie, int showStartTime) {
-
-        Show show = new Show();
-        show.setShowId(showId);
-        show.setScreen(screen);
-        show.setMovie(movie);
-        show.setShowStartTime(showStartTime); //24 hrs time ex: 14 means 2pm and 8 means 8AM
-        return show;
-    }
-
-    //creating 100 seats
+    /**
+     * Creates and returns a list of seats for a screen.
+     *
+     * @return List of Seat objects with SILVER category
+     */
     private List<Seat> createSeats() {
-
-        //creating 100 seats for testing purpose, this can be generalised
         List<Seat> seats = new ArrayList<>();
-
-        //1 to 40 : SILVER
-        for (int i = 0; i < 40; i++) {
-            Seat seat = new Seat();
-            seat.setSeatId(i);
-            seat.setSeatCategory(SeatCategory.SILVER);
-            seats.add(seat);
+        for (int i = 1; i <= 20; i++) {
+            seats.add(new Seat(i, SeatCategory.SILVER));
         }
-
-        //41 to 70 : SILVER
-        for (int i = 40; i < 70; i++) {
-            Seat seat = new Seat();
-            seat.setSeatId(i);
-            seat.setSeatCategory(SeatCategory.GOLD);
-            seats.add(seat);
-        }
-
-        //1 to 40 : SILVER
-        for (int i = 70; i < 100; i++) {
-            Seat seat = new Seat();
-            seat.setSeatId(i);
-            seat.setSeatCategory(SeatCategory.PLATINUM);
-            seats.add(seat);
-        }
-
         return seats;
-    }
-
-    private void createMovies() {
-
-        //create Movies1
-        Movie avengers = new Movie();
-        avengers.setMovieId(1);
-        avengers.setMovieName("AVENGERS");
-        avengers.setMovieDuration(128);
-
-        //create Movies2
-        Movie baahubali = new Movie();
-        baahubali.setMovieId(2);
-        baahubali.setMovieName("BAAHUBALI");
-        baahubali.setMovieDuration(180);
-
-
-        //add movies against the cities
-        movieController.addMovie(avengers, City.Bangalore);
-        movieController.addMovie(avengers, City.Delhi);
-        movieController.addMovie(baahubali, City.Bangalore);
-        movieController.addMovie(baahubali, City.Delhi);
     }
 }
