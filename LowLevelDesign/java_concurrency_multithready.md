@@ -926,6 +926,142 @@ synchronized (lock) {
 }
 ```
 
+# wait() and notify() — Interview Questions
+
+---
+
+## Q1. Why is the `while` loop mandatory with `wait()` and not `if`?
+
+This is the question that separates people who read about `wait()` from people who have debugged it at 2am.
+
+Using `if` means you check the condition once, get notified, and assume the condition is still true. That assumption is wrong in practice.
+
+Here is why.
+
+When `notifyAll()` is called, every waiting thread wakes up. All of them compete for the lock. The first thread wins, checks the condition, finds it true, proceeds, and consumes the resource. Now the second thread wins the lock. The condition is no longer true. But if you used `if`, you skip the check entirely and proceed anyway. You just introduced a bug.
+
+This is called a spurious wakeup. The JVM is also allowed to wake up a waiting thread for no reason at all. It is in the Java specification. If you use `if`, a spurious wakeup will send your thread past the condition check with no resource available.
+
+The `while` loop solves both problems. Every time a thread wakes up, it re-checks the condition. If the condition is not met, it calls `wait()` again and goes back to sleep.
+
+The pattern is always this:
+```java
+while (!condition) {
+    wait();
+}
+```
+
+Never use `if`. Always `while`.
+
+This one mistake causes some of the hardest bugs to reproduce in concurrent Java code because they only show up under specific thread scheduling conditions in production.
+
+---
+
+## Q2. What happens if you call `wait()` outside a synchronized block?
+
+It throws `IllegalMonitorStateException` at runtime. Not a compile error. A runtime crash.
+
+But the deeper interview answer is explaining why this rule exists.
+
+`wait()` does two things atomically. It releases the monitor lock and suspends the thread. These two operations happen as a single indivisible unit. There is no gap between releasing the lock and entering the wait set.
+
+If `wait()` were allowed outside a synchronized block, you would not hold the lock in the first place. There would be nothing to release. The atomicity guarantee would be meaningless.
+
+Here is the race condition that would happen without this rule:
+
+1. Thread A checks the condition. Condition is false.
+2. Thread A is about to call `wait()`.
+3. Before it does, Thread B runs, changes the condition to true, and calls `notify()`.
+4. Now Thread A calls `wait()`. It missed the notification. It waits forever.
+
+This is called a **missed signal** and it is a deadlock.
+
+The `synchronized` block prevents this. Thread A holds the lock while checking the condition and while calling `wait()`. Thread B cannot call `notify()` until Thread A has released the lock, which only happens inside `wait()` after Thread A is already in the wait set. The signal cannot be missed.
+
+This is why all three iron rules exist together. They are not arbitrary restrictions. They prevent a specific class of deadlocks.
+
+---
+
+## Q3. What is the difference between `notify()` and `notifyAll()`?
+
+`notify()` wakes up one arbitrary thread from the wait set. The JVM decides which one. You have no control. No fairness. No ordering guarantee.
+
+`notifyAll()` wakes up every thread in the wait set. Each one competes for the lock. Each one re-checks its condition. The ones whose condition is not met go back to waiting.
+
+**`notify()` is only safe when all three conditions are true:**
+- All waiting threads are waiting for the same condition
+- Satisfying that condition enables exactly one thread to proceed
+- All waiting threads run identical code
+
+The producer-consumer pattern violates this. Some threads wait because the buffer is full. Other threads wait because the buffer is empty. These are two different conditions.
+
+If a producer calls `notify()` and it accidentally wakes another producer instead of a consumer, that producer checks the buffer, finds it still full, and calls `wait()` again. The consumer that could have proceeded is still sleeping. Eventually all threads are waiting and none can proceed. That is a **deadlock caused by a missed signal**.
+
+`notifyAll()` solves this. Every thread wakes up. Every thread checks its own condition. The right thread proceeds.
+
+> **Default rule: Always use `notifyAll()`. It is always correct. `notify()` is an optimization you apply only when you can prove all three conditions above are met.**
+
+---
+
+## Q4. What is the difference between `wait()` and `sleep()`?
+
+| Property | `Object.wait()` | `Thread.sleep()` |
+|---|---|---|
+| Defined in | `Object` | `Thread` |
+| Releases monitor lock? | YES | NO |
+| Requires `synchronized` block? | YES | No restriction |
+| How to wake early | `notify()` or `notifyAll()` | `interrupt()` |
+| Thread state | `WAITING` or `TIMED_WAITING` | `TIMED_WAITING` |
+| Use case | Inter-thread coordination | Simple time delay |
+
+**The most important difference:**
+
+`wait()` releases the monitor lock while the thread is suspended. `sleep()` does not release any lock. It holds every lock it acquired and just pauses execution. If another thread needs that lock while this thread is sleeping, it blocks.
+
+This is how `sleep()` inside a `synchronized` block causes accidental bottlenecks.
+
+**The interview trap:**
+
+People confuse them because both throw `InterruptedException` and both suspend a thread. The suspension looks the same from the outside. The behavior with respect to locks is completely different on the inside.
+
+- Use `wait()` when a thread needs to pause until another thread creates a condition.
+- Use `sleep()` when you just need a fixed time delay with no coordination involved.
+
+---
+
+## Q5. Walk me through the exact thread state transitions after `notifyAll()` is called.
+
+This is a senior-level question. Most people get it wrong because they skip the `BLOCKED` state in the middle.
+
+Here is the exact sequence:
+```
+Thread is WAITING
+    │
+    │  notifyAll() is called
+    ▼
+Thread is BLOCKED (competing to re-acquire the monitor)
+    │
+    │  Thread wins the lock
+    ▼
+Thread is RUNNABLE
+    │
+    │  Resumes from exactly where wait() was called
+    ▼
+while (!condition) check executes again
+```
+
+**Step by step:**
+
+1. Thread is in `WAITING` state. It called `wait()` earlier, released the lock, and is fully suspended. Zero CPU usage.
+2. `notifyAll()` is called. The thread moves out of the wait set. It does not go to `RUNNABLE`. It goes to `BLOCKED`. This is the step most people miss.
+3. `BLOCKED` means the thread is alive and wants to run but cannot because it needs to re-acquire the monitor lock.
+4. If multiple threads were waiting, all move to `BLOCKED` simultaneously. They all compete for the same lock. Only one wins.
+5. The winner moves from `BLOCKED` to `RUNNABLE`. It resumes from exactly the line after `wait()` was called.
+6. The first thing it does is re-check the `while` loop condition. Not proceed. Check first.
+7. If the condition is not met, it calls `wait()` again and goes back to `WAITING`.
+8. The losers stay in `BLOCKED` until the winner releases the lock. Then the cycle repeats.
+
+> The path is always `WAITING` → `BLOCKED` → `RUNNABLE`. Never `WAITING` directly to `RUNNABLE`. The lock re-acquisition step is mandatory and it is not instant.
 ---
 
 ## 9. Thread.join() — Ordering Execution
