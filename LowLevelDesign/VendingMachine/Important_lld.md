@@ -1,4 +1,4 @@
-# Kotak SDE-2 LLD Interview Guide
+
 ## Banking Domain: Gold Loan | UPI | KYC — Rulebook Edition
 
 > **Every design in this file follows the 12-step LLD Rulebook exactly, in order.**
