@@ -2,8 +2,6 @@
 ## Banking Domain: Gold Loan | UPI | KYC — Rulebook Edition
 
 > **Every design in this file follows the 12-step LLD Rulebook exactly, in order.**
-> Same interviewer. Gold Loan team manager. He knows your KYC design from last round.
-> Read this the night before. Recite the opening lines out loud.
 
 ---
 
