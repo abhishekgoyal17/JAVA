@@ -1,5 +1,5 @@
 # LLD + JAVA INTERVIEW RULEBOOK
-## Adobe (and Product Company) Edition
+
 
 > **HOW TO USE THIS RULEBOOK**
 > When given an LLD question, follow every numbered step in order.
@@ -95,6 +95,86 @@ Let me proceed with these assumptions unless you'd like to change anything."
 > Non-Functional → decides your **data structures, design patterns, and concurrency approach**
 
 ---
+## 2.0
+## 1. The Entity Identification Framework
+
+This is the **core skill** you're struggling with. Here's a repeatable algorithm.
+
+### Step 1 — Noun Extraction Filter
+
+Read the problem statement and underline every noun. Then apply this 3-question filter to each:
+
+| Question | If YES → | If NO → |
+|---|---|---|
+| Does it have its own **identity** (unique ID)? | Strong Entity candidate | Might be a value object / field |
+| Does it have **state that changes** over time? | Definite Entity | Might be just an enum / constant |
+| Does it have **behavior** (does things or things happen to it)? | Needs its own class | Might be a field on another entity |
+
+### Step 2 — The 4 Entity Archetypes
+
+Every entity in any LLD problem falls into one of these four buckets:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ARCHETYPE 1: The ACTOR                                             │
+│  Who uses/interacts with the system?                                │
+│  Examples: User, Customer, Driver, Admin, Agent                     │
+│  Always has: id, name, contact info, role/status                    │
+├─────────────────────────────────────────────────────────────────────┤
+│  ARCHETYPE 2: The RESOURCE                                          │
+│  What is being managed / allocated / consumed?                      │
+│  Examples: ParkingSpot, Seat, Room, Book, Ticket                    │
+│  Always has: id, availability status, type/category                 │
+├─────────────────────────────────────────────────────────────────────┤
+│  ARCHETYPE 3: The TRANSACTION                                       │
+│  What happens when Actor interacts with Resource?                   │
+│  Examples: Booking, Payment, Ticket, Ride, Order                    │
+│  Always has: id, timestamp, actorRef, resourceRef, status           │
+├─────────────────────────────────────────────────────────────────────┤
+│  ARCHETYPE 4: The COORDINATOR / MANAGER                             │
+│  What orchestrates the system? (Often a Singleton)                  │
+│  Examples: ParkingLot, Library, VendingMachine, ElevatorController  │
+│  Always has: collection of Resources, business rules, state mgmt    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Step 3 — Relationship Identification
+
+After finding entities, ask these 3 questions for every pair:
+
+1. **Has-A or Is-A?**
+   - `ParkingLot` has `ParkingFloor`s → Composition
+   - `Car` is-a `Vehicle` → Inheritance
+   - `Booking` has-a reference to `User` → Association
+
+2. **Multiplicity?**
+   - One ParkingLot → Many ParkingFloors (1:N)
+   - One User → Many Bookings (1:N)
+   - One Show → Many Seats (1:N)
+   - One Booking → One Seat (1:1)
+
+3. **Lifecycle dependency?**
+   - If parent dies, does child die? → **Composition** (strong)
+   - Child can exist independently? → **Aggregation** (weak)
+
+### Step 4 — The "What Varies?" Question
+
+This is how you identify where design patterns are needed:
+
+```
+Ask: "What might change in future or vary across cases?"
+
+ ↓ The FEE CALCULATION varies? → Strategy Pattern
+ ↓ The OBJECT CREATION varies? → Factory / Abstract Factory
+ ↓ The NOTIFICATION mechanism varies? → Observer Pattern
+ ↓ The OBJECT STATE changes significantly? → State Pattern
+ ↓ Only ONE instance should exist? → Singleton
+ ↓ You want to ADD behavior dynamically? → Decorator
+ ↓ You need to DECOUPLE complex subsystems? → Facade
+```
+
+---
+## 2.1
 
 ## STEP 2 — DRAW CLASS DIAGRAM (3–4 min)
 
@@ -162,18 +242,22 @@ Say: *"Let me trace the flow for the primary use case."*
 ### Sequence Diagram Notation (Text Format)
 
 ```
-Client          Controller       Service         Repository        External
-  |                 |                |                |                |
-  |—— request() ——>|                |                |                |
-  |                |—— validate() ——>|                |                |
-  |                |                |—— findById() ——>|                |
-  |                |                |                |——— query() ———>|
-  |                |                |                |<—— result ————|
-  |                |                |<——— entity ————|                |
-  |                |                |—— process()    |                |
-  |                |                |—— save() ——————>|                |
-  |                |<—— response ———|                |                |
-  |<—— 200 OK ————|                |                |                |
+Client          Controller                Service                Repository            External
+  |                 |                        |                        |                    |
+  |-- POST /api/v1/kyc ------------------->|                        |                    |
+  |   (Create KYC Request)                |                        |                    |
+  |                 |-- validate() ------>|                        |                    |
+  |                 |                     |-- GET /kyc/{id} ------>|                    |
+  |                 |                     |                        |-- query() -------->|
+  |                 |                     |                        |<-- result ---------|
+  |                 |                     |<-- entity -------------|                    |
+  |                 |                     |-- GET /external/user/{id} ----------------->|
+  |                 |                     |<---------------------- external data -------|
+  |                 |                     |-- process()            |                    |
+  |                 |                     |-- PUT /kyc/{id} ------>|                    |
+  |                 |                     |                        |-- save() ----------|
+  |                 |<-- response --------|                        |                    |
+  |<-- 201 Created --|                    |                        |                    |
 ```
 
 ### Rules for Sequence Diagram
