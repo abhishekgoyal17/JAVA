@@ -41,6 +41,167 @@
 
 ---
 
+# JVM Memory Model — Process, Threads & Memory Segments
+
+> **Where to insert:** Add this section at the very top of your existing multithreading README, before Topic 1 (Why Concurrency Exists).
+
+---
+
+## 0. JVM Memory Architecture — The Foundation
+
+Before diving into threads, you need to understand **how the JVM lays out memory** and what each thread actually owns vs shares.
+
+---
+
+### Process vs JVM Instance
+
+A **Process** is an OS-level abstraction. Each Java program you run = one **OS Process** = one **JVM Instance**.
+
+```
+OS
+├── Process1  →  JVM Instance1  (heap: 2GB, its own address space)
+└── Process2  →  JVM Instance2  (heap: 2GB, its own address space)
+```
+
+- Two JVM instances are **completely isolated** from each other.
+- Same virtual memory address (e.g., `0x8000`) in Process1 and Process2 points to **different physical RAM locations**.
+- Processes do NOT share heap memory. Threads within the same process DO.
+
+---
+
+### Memory Segments Inside a JVM Process
+
+Every JVM process has two **shared** segments and per-thread **private** state:
+
+```
+JVM Instance (Process)
+│
+├── [SHARED — all threads see this]
+│   ├── Code Segment
+│   ├── Data Segment
+│   └── Heap
+│
+└── [PRIVATE — each thread owns its own copy]
+    ├── Stack
+    ├── Register
+    └── Program Counter (PC)
+```
+
+---
+
+### Code Segment
+
+- Contains the **compiled Bytecode** (i.e., machine code) of the Java program.
+- **Read-only** — no thread can modify it at runtime.
+- **Shared** across all threads within the same process.
+- Since it's immutable, there are **no synchronization concerns** here.
+
+---
+
+### Data Segment
+
+- Contains **global and static variables** (e.g., `static int counter`).
+- **Shared** across all threads within the same process.
+- Threads can **read and modify** the same data.
+- ⚠️ **Synchronization is required** — this is one of the primary sources of race conditions in Java.
+
+```java
+class Counter {
+    static int count = 0; // lives in Data Segment — shared by all threads
+}
+```
+
+---
+
+### Heap
+
+- Objects created at runtime via the `new` keyword are allocated on the heap.
+- **Shared** among all threads of the **same process**.
+- **NOT shared across processes** — each JVM instance has its own heap.
+- Threads can read and modify heap data concurrently → synchronization needed.
+
+```java
+// This object lives on the heap — visible to all threads in the process
+MyObject obj = new MyObject();
+```
+
+> Example: In Process1, virtual address `0x8000` may point to some heap object.  
+> In Process2, the same address `0x8000` points to a **completely different** physical memory location.
+
+---
+
+### Stack (Per-Thread)
+
+- **Each thread has its own private Stack.**
+- Manages:
+  - Method call frames
+  - Local variables
+  - Return addresses
+- Stack data is **never shared** between threads → no synchronization needed for local variables.
+
+```java
+void compute() {
+    int x = 10; // lives on THIS thread's stack — completely private
+}
+```
+
+---
+
+### Register (Per-Thread)
+
+- **Each thread has its own set of CPU Registers.**
+- When the JIT (Just-In-Time) compiler converts Bytecode into native machine code, it uses registers to **optimize** the generated instructions.
+- Registers also hold intermediate values during **context switching** — the CPU saves/restores register state when switching between threads.
+
+---
+
+### Program Counter / Counter (Per-Thread)
+
+- Also called the **Program Counter (PC)**.
+- Points to the instruction currently being executed by that thread.
+- **Increments** after each successful instruction execution.
+- Each thread has its own PC → threads execute independently and track their own position in the code.
+
+---
+
+### Full Picture — CPU + JVM + RAM
+
+```
+CPU1                        CPU2
+├── Register (T1)           ├── Register (T2)
+└── L1/L2 Cache             └── L1/L2 Cache
+         │                           │
+         └──────────┬────────────────┘
+                    │
+              Main Memory (RAM)
+              ├── JVM Process1
+              │   ├── Heap (shared among T1, T2, T3)
+              │   ├── Code Segment (shared, read-only)
+              │   ├── Data Segment (shared, mutable)
+              │   ├── Stack-T1 (private)
+              │   ├── Stack-T2 (private)
+              │   └── Stack-T3 (private)
+              └── JVM Process2
+                  └── (completely isolated heap + segments)
+```
+
+> **Why this matters for concurrency:** The CPU cache layer is what causes visibility problems. A value written by CPU1 may sit in its cache and not be flushed to Main Memory, making it invisible to CPU2. This is exactly why `volatile` and the Java Memory Model (JMM) exist — covered in Topic 19.
+
+---
+
+### Quick Reference — What's Shared vs Private
+
+| Memory Area    | Shared or Private?              | Sync Needed? |
+|----------------|---------------------------------|--------------|
+| Code Segment   | Shared (all threads in process) | No (read-only) |
+| Data Segment   | Shared (all threads in process) | ✅ Yes        |
+| Heap           | Shared (all threads in process) | ✅ Yes        |
+| Stack          | Private (per thread)            | No            |
+| Register       | Private (per thread)            | No            |
+| Program Counter| Private (per thread)            | No            |
+
+---
+
 ## 1. Why Concurrency Exists — The Hardware Story
 
 Before writing a single line of concurrent Java, you need to understand *why* concurrency exists at all. It is not a software abstraction. It is a direct consequence of how modern hardware works.
