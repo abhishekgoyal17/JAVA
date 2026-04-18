@@ -202,6 +202,201 @@ CPU1                        CPU2
 
 ---
 
+## 0.1 — How Java Code Actually Executes: Bytecode → CPU → RAM
+
+---
+
+### Step 1: Java source → Bytecode → Machine code (JIT)
+
+```
+Java source (.java)
+        │
+        │  javac
+        ▼
+Bytecode (.class file)          ← platform-independent
+        │
+        │  JVM loads it
+        ▼
+JIT Compiler (inside JVM)
+    ├── Phase 1: Interpret bytecode line by line (slow, cold start)
+    ├── Phase 2: Profile which methods are "hot" (called frequently)
+    └── Phase 3: Compile hot methods → native machine code
+        │
+        ▼
+Native machine code             ← stored in JVM Code Cache (RAM)
+        │
+        ▼
+CPU executes it using registers
+```
+
+**Key points:**
+- Bytecode is NOT machine code. It is an intermediate representation understood by the JVM.
+- JIT compiles bytecode to CPU-specific instructions (x86, ARM, etc.) at runtime.
+- The JIT uses CPU registers to **optimize** the generated native instructions — e.g., keeping a loop counter in a register instead of reading it from RAM every iteration.
+- Each thread has its own Register set and Program Counter. The Register holds intermediate values; the PC points to the next instruction to execute.
+
+---
+
+### Step 2: CPU Register → L1 → L2 → L3 → RAM (cache hierarchy)
+
+```
+┌──────────────────────┐    ┌──────────────────────┐
+│      CPU Core 1      │    │      CPU Core 2       │
+│                      │    │                       │
+│  ┌────────────────┐  │    │  ┌────────────────┐   │
+│  │   Registers    │  │    │  │   Registers    │   │
+│  │  ~1 cycle      │  │    │  │  ~1 cycle      │   │
+│  │  ~1KB per thrd │  │    │  │  ~1KB per thrd │   │
+│  └───────┬────────┘  │    │  └───────┬────────┘   │
+│          │           │    │          │             │
+│  ┌───────▼────────┐  │    │  ┌───────▼────────┐   │
+│  │   L1 Cache     │  │    │  │   L1 Cache     │   │
+│  │  ~4 cycles     │  │    │  │  ~4 cycles     │   │
+│  │  32–64KB       │  │    │  │  32–64KB       │   │
+│  └───────┬────────┘  │    │  └───────┬────────┘   │
+│          │           │    │          │             │
+│  ┌───────▼────────┐  │    │  ┌───────▼────────┐   │
+│  │   L2 Cache     │  │    │  │   L2 Cache     │   │
+│  │  ~12 cycles    │  │    │  │  ~12 cycles    │   │
+│  │  256KB–1MB     │  │    │  │  256KB–1MB     │   │
+│  └───────┬────────┘  │    │  └───────┬────────┘   │
+└──────────┼───────────┘    └──────────┼─────────────┘
+           │                           │
+           └──────────┬────────────────┘
+                      │
+           ┌──────────▼────────────┐
+           │   L3 Cache (shared)   │
+           │   ~40 cycles          │
+           │   4–32MB              │
+           └──────────┬────────────┘
+                      │
+           ┌──────────▼────────────┐
+           │   Main Memory (RAM)   │
+           │   ~100 cycles         │
+           │   GBs                 │
+           └───────────────────────┘
+```
+
+**Why this matters for Java concurrency:**
+- Thread A runs on Core 1. It writes `counter = 5` — this write goes into Core 1's L1 cache first.
+- Thread B runs on Core 2. It reads `counter` — but Core 2's L1 might still have the OLD value.
+- This is the **CPU cache visibility problem** — the root cause of why `volatile` and `synchronized` exist.
+- `volatile` forces writes to go to main memory and reads to come from main memory, bypassing cache.
+
+---
+
+### Step 3: Program Counter (PC) and Register — per-thread execution
+
+```
+Thread 1                         Thread 2
+┌─────────────────┐              ┌─────────────────┐
+│ Program Counter │              │ Program Counter │
+│ Points to next  │              │ Points to next  │
+│ instruction     │              │ instruction     │
+│                 │              │                 │
+│ Register set    │              │ Register set    │
+│ Holds JIT-      │              │ Holds JIT-      │
+│ optimized temp  │              │ optimized temp  │
+│ values          │              │ values          │
+└─────────────────┘              └─────────────────┘
+         │                                │
+         └──────── CPU (shared) ──────────┘
+```
+
+- **Program Counter**: each thread tracks its OWN position in the instruction stream. When a thread is paused and resumed, execution continues from exactly where the PC left off.
+- **Register**: the JIT compiler maps frequently used variables to CPU registers for speed. Each thread's register state is completely private — saved/restored on every context switch.
+
+---
+
+### Step 4: Context switching — OS scheduler
+
+When the OS switches a CPU core from Thread A to Thread B:
+
+```
+Thread A running on Core 1
+        │
+        │  OS timer interrupt fires (every ~1–10ms)
+        ▼
+OS Scheduler takes control
+        │
+        ├─► Save Thread A state → PCB (Process Control Block) in RAM
+        │       - all registers (R0..Rn)
+        │       - program counter value
+        │       - stack pointer
+        │       - CPU flags
+        │
+        ├─► Select Thread B from run queue (priority, fairness policy)
+        │
+        ├─► Load Thread B state ← PCB from RAM
+        │       - restore all registers
+        │       - restore program counter
+        │       - restore stack pointer
+        │
+        ▼
+Thread B resumes on Core 1 — exactly where it left off
+```
+
+**Why context switches are expensive:**
+1. **PCB save/restore** — reading/writing registers to RAM costs cycles.
+2. **Cache is now cold** — Thread B's working data is NOT in L1/L2. The CPU must fetch from RAM (100× slower) until the cache warms up again.
+3. **TLB flush** — if switching between processes (not just threads), the CPU's address translation cache is invalidated.
+
+> This is why virtual threads (Project Loom) are faster — they are scheduled by the JVM, not the OS. The JVM switch cost is lower and avoids kernel mode transitions.
+
+---
+
+### Step 5: Multi-core — concurrency vs true parallelism
+
+```
+Single core (concurrency — interleaved):
+
+Core 1 timeline:
+│ Thread A │ Thread B │ Thread A │ Thread B │ ...
+└──────────────────────────────────────────────▶ time
+
+Only one thread executes at any moment. Threads take turns.
+
+
+Multi-core (parallelism — simultaneous):
+
+Core 1:  │ Thread A │ Thread A │ Thread A │ ...
+Core 2:  │ Thread B │ Thread B │ Thread B │ ...
+                                               ▶ time
+
+Both threads run at the exact same instant.
+```
+
+**The danger of multi-core:**
+
+```java
+// Thread A (Core 1)           // Thread B (Core 2)
+counter++;                      counter++;
+// Both read counter = 0
+// Both compute 0 + 1 = 1
+// Both write 1
+// Final value: 1 — not 2!     ← RACE CONDITION
+```
+
+- Multi-core makes race conditions **real** — two cores can literally execute the same instruction simultaneously on different cache-lines of the same variable.
+- Single-core concurrency has the illusion of simultaneity but the CPU actually serializes at instruction level.
+- Shared mutable state (heap, static fields) is the problem. Per-thread state (stack, registers, PC) is always safe.
+
+---
+
+### Quick Reference — What each component stores
+
+| Component | Scope | Stores | Speed |
+|-----------|-------|--------|-------|
+| Register | Per-thread (private) | JIT-optimized temp values, current operands | ~1 cycle |
+| Program Counter | Per-thread (private) | Address of next instruction | ~1 cycle |
+| Stack | Per-thread (private) | Method frames, local variables | L1 speed |
+| L1 Cache | Per-core (private) | Recently accessed data/instructions | ~4 cycles |
+| L2 Cache | Per-core (private) | Overflow from L1 | ~12 cycles |
+| L3 Cache | Shared across cores | Overflow from L2 | ~40 cycles |
+| RAM (Heap) | Shared across all threads | Objects, static fields, code cache | ~100 cycles |
+
+---
+
 ## 1. Why Concurrency Exists — The Hardware Story
 
 Before writing a single line of concurrent Java, you need to understand *why* concurrency exists at all. It is not a software abstraction. It is a direct consequence of how modern hardware works.
