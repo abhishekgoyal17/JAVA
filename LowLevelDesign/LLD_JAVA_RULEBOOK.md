@@ -6,7 +6,7 @@
 > Do not skip any step. Call out each step by name before starting it.
 > Use the exact senior-level phrases listed. Show UML inline using text notation.
 >
-> **NEW STEP ORDER (based on actual Fivetran / product-company interview reports):**
+> **NEW STEP ORDER (based on actual / product-company interview reports):**
 > Step 1 → Clarify → Step 2 → Entities → Step 3 → DB Schema → Step 4 → API Design
 > → Step 5 → Class Diagram → Step 6 → Sequence Diagram → Step 7 → Code
 > → Step 8 → Concurrency → Step 9 → Patterns → Step 10 → Principles
