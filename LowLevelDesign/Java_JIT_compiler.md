@@ -1,4 +1,4 @@
-Here's the elaborated version:
+
 
 ---
 
@@ -253,4 +253,6 @@ But it cannot fix structural problems. That is your job.
 Save this if you are preparing for performance engineering rounds.
 
 #Java #PerformanceEngineering #JVM #JIT #BackendEngineering #JavaDeveloper #SystemDesign #SoftwareEngineering #TechInterview
+
+https://www.ibm.com/docs/en/sdk-java-technology/8?topic=compiler-how-jit-optimizes-code
 ```
