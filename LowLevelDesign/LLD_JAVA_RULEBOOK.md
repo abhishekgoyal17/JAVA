@@ -1,10 +1,16 @@
 # LLD + JAVA INTERVIEW RULEBOOK
-
+## Updated Edition — Includes DB Schema Design + REST API Design
 
 > **HOW TO USE THIS RULEBOOK**
 > When given an LLD question, follow every numbered step in order.
 > Do not skip any step. Call out each step by name before starting it.
 > Use the exact senior-level phrases listed. Show UML inline using text notation.
+>
+> **NEW STEP ORDER (based on actual Fivetran / product-company interview reports):**
+> Step 1 → Clarify → Step 2 → Entities → Step 3 → DB Schema → Step 4 → API Design
+> → Step 5 → Class Diagram → Step 6 → Sequence Diagram → Step 7 → Code
+> → Step 8 → Concurrency → Step 9 → Patterns → Step 10 → Principles
+> → Step 11 → Edge Cases → Step 12 → Logging → Step 13 → Scale
 
 ---
 
@@ -14,7 +20,7 @@ Say: *"Before jumping into implementation, let me clarify both functional and no
 
 ---
 
-### 🟢 Part A — Functional Requirements (What the system DOES)
+### Part A — Functional Requirements (What the system DOES)
 
 Say: *"First, let me understand the core use cases."*
 
@@ -23,9 +29,9 @@ Ask:
 - What **actions** can each actor perform?
 - What is the **primary happy path** end to end?
 - Are there **secondary use cases**? (cancel, refund, search, review)
-- Any features that are explicitly **out of scope**?
+- Any features explicitly **out of scope**?
 
-> Write these as: *"The system shall allow [actor] to [action]."*
+Write these as: *"The system shall allow [actor] to [action]."*
 
 **Example output:**
 ```
@@ -41,7 +47,7 @@ Functional Requirements:
 
 ---
 
-### 🔴 Part B — Non-Functional Requirements (How the system BEHAVES)
+### Part B — Non-Functional Requirements (How the system BEHAVES)
 
 Say: *"Now let me clarify the quality constraints."*
 
@@ -49,28 +55,18 @@ Say: *"Now let me clarify the quality constraints."*
 |---|---|
 | Scale | How many users? Expected RPS? Read-heavy or write-heavy? |
 | Concurrency | Can multiple users/threads access the same resource simultaneously? |
-| Consistency | Strong or eventual consistency? (e.g., seat booking must be strongly consistent) |
-| Latency | Any SLA? Response time target? (e.g., < 200ms) |
+| Consistency | Strong or eventual consistency? |
+| Latency | Any SLA? Response time target? |
 | Availability | 99.9% uptime? Can the system go down briefly? |
 | Durability | In-memory OK or must data survive restart? |
 | Idempotency | Should the same request twice produce the same result? |
-| Extensibility | Will new types / strategies be added later? (drives pattern choice) |
-| Failure Handling | What happens on partial failure? Retry? Rollback? Compensate? |
+| Extensibility | Will new types / strategies be added later? |
+| Failure Handling | What happens on partial failure? Retry? Rollback? |
 | Scope | Single JVM or distributed? External DB or in-memory? |
-
-**Example output:**
-```
-Non-Functional Requirements:
-- In-memory storage (single JVM, no external DB)
-- Concurrent access expected — thread safety required
-- Order placement must be idempotent (same requestId = same result)
-- Payment strategy must be extensible (Credit, UPI, Wallet)
-- Cancellation only allowed in PENDING state (state validation required)
-```
 
 ---
 
-### ✅ Output of Step 1 — State These Aloud Before Moving On
+### Output of Step 1 — State Aloud Before Moving On
 
 ```
 "Based on my understanding:
@@ -81,7 +77,7 @@ Functional:
   3. System notifies user on status change
 
 Non-Functional:
-  1. In-memory, single JVM
+  1. In-memory storage OR persistent DB (I'll clarify which)
   2. Concurrent access — I'll use ConcurrentHashMap + locks
   3. Idempotent order placement — requestId dedup
   4. Payment is extensible — I'll use Strategy pattern
@@ -90,29 +86,18 @@ Non-Functional:
 Let me proceed with these assumptions unless you'd like to change anything."
 ```
 
-> **Why this matters:**
 > Functional → decides your **entities, methods, and relationships**
 > Non-Functional → decides your **data structures, design patterns, and concurrency approach**
 
 ---
-## 2.0
-## 1. The Entity Identification Framework
 
-This is the **core skill** you're struggling with. Here's a repeatable algorithm.
+## STEP 2 — ENTITY IDENTIFICATION (2 min)
 
-### Step 1 — Noun Extraction Filter
+Say: *"Let me identify the core entities before modeling the schema or classes."*
 
-Read the problem statement and underline every noun. Then apply this 3-question filter to each:
+### The 4 Entity Archetypes
 
-| Question | If YES → | If NO → |
-|---|---|---|
-| Does it have its own **identity** (unique ID)? | Strong Entity candidate | Might be a value object / field |
-| Does it have **state that changes** over time? | Definite Entity | Might be just an enum / constant |
-| Does it have **behavior** (does things or things happen to it)? | Needs its own class | Might be a field on another entity |
-
-### Step 2 — The 4 Entity Archetypes
-
-Every entity in any LLD problem falls into one of these four buckets:
+Every entity falls into one of these four buckets:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -123,64 +108,484 @@ Every entity in any LLD problem falls into one of these four buckets:
 ├─────────────────────────────────────────────────────────────────────┤
 │  ARCHETYPE 2: The RESOURCE                                          │
 │  What is being managed / allocated / consumed?                      │
-│  Examples: ParkingSpot, Seat, Room, Book, Ticket                    │
+│  Examples: ParkingSpot, Seat, Room, Book, Ticket, Connector         │
 │  Always has: id, availability status, type/category                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ARCHETYPE 3: The TRANSACTION                                       │
 │  What happens when Actor interacts with Resource?                   │
-│  Examples: Booking, Payment, Ticket, Ride, Order                    │
+│  Examples: Booking, Payment, SyncJob, Order, AuditEvent             │
 │  Always has: id, timestamp, actorRef, resourceRef, status           │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ARCHETYPE 4: The COORDINATOR / MANAGER                             │
 │  What orchestrates the system? (Often a Singleton)                  │
-│  Examples: ParkingLot, Library, VendingMachine, ElevatorController  │
+│  Examples: ParkingLot, Library, SyncScheduler, ConnectorRegistry    │
 │  Always has: collection of Resources, business rules, state mgmt    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Step 3 — Relationship Identification
-
-After finding entities, ask these 3 questions for every pair:
-
-1. **Has-A or Is-A?**
-   - `ParkingLot` has `ParkingFloor`s → Composition
-   - `Car` is-a `Vehicle` → Inheritance
-   - `Booking` has-a reference to `User` → Association
-
-2. **Multiplicity?**
-   - One ParkingLot → Many ParkingFloors (1:N)
-   - One User → Many Bookings (1:N)
-   - One Show → Many Seats (1:N)
-   - One Booking → One Seat (1:1)
-
-3. **Lifecycle dependency?**
-   - If parent dies, does child die? → **Composition** (strong)
-   - Child can exist independently? → **Aggregation** (weak)
-
-### Step 4 — The "What Varies?" Question
-
-This is how you identify where design patterns are needed:
+### The "What Varies?" Question (Pattern Trigger)
 
 ```
-Ask: "What might change in future or vary across cases?"
+What might change or vary across cases?
 
- ↓ The FEE CALCULATION varies? → Strategy Pattern
- ↓ The OBJECT CREATION varies? → Factory / Abstract Factory
- ↓ The NOTIFICATION mechanism varies? → Observer Pattern
- ↓ The OBJECT STATE changes significantly? → State Pattern
- ↓ Only ONE instance should exist? → Singleton
- ↓ You want to ADD behavior dynamically? → Decorator
- ↓ You need to DECOUPLE complex subsystems? → Facade
+ ↓ The FEE / ALGORITHM varies?         → Strategy Pattern
+ ↓ The OBJECT CREATION varies?         → Factory / Abstract Factory
+ ↓ The NOTIFICATION mechanism varies?  → Observer Pattern
+ ↓ The OBJECT STATE changes?           → State Pattern
+ ↓ Only ONE instance should exist?     → Singleton
+ ↓ You want to ADD behavior?           → Decorator
+ ↓ You need to DECOUPLE subsystems?    → Facade
 ```
 
 ---
-## 2.1
 
-## STEP 2 — DRAW CLASS DIAGRAM (3–4 min)
+## STEP 3 — DATABASE SCHEMA DESIGN (5–7 min)
 
-Say: *"Let me model the core entities and their relationships."*
+Say: *"Before writing any code, let me design the DB schema. This grounds the entire system in concrete data. I'll define tables, columns, data types, constraints, and indexes."*
 
-### Class Diagram Notation (Text Format — Use in Interview)
+---
+
+### DB Schema Design Principles — Say These Explicitly
+
+**Append-only for events/audit:**
+> "Sync events, audit logs, and transaction records are append-only. I never UPDATE these rows — I always INSERT a new event. This preserves history and enables replay."
+
+**Soft deletes for core entities:**
+> "I never hard-delete connectors, users, or products. I use `is_deleted = TRUE` + `deleted_at`. Foreign keys from event tables reference the entity — hard delete would break referential integrity."
+
+**Idempotency key on mutations:**
+> "Each write operation gets an `idempotency_key`. Duplicate submissions are rejected at the DB layer via UNIQUE constraint — no double-processing."
+
+**Separate checkpoint / cursor table:**
+> "I store the cursor/watermark in a separate table, not embedded in the parent entity. This lets me atomically update the checkpoint without touching the main entity row."
+
+**No FK on append-only log tables:**
+> "Audit and event tables reference entity IDs as plain VARCHAR — no FK. If the entity is deleted, the log must survive. A FK would either block deletion or orphan the log."
+
+**Index strategy — always call this out:**
+> "I index on the most frequent query patterns. For status-based queries: `(connector_id, status)`. For history: `(connector_id, created_at DESC)`. Partial indexes with `WHERE is_deleted = FALSE` keep the index small."
+
+---
+
+### SQL DDL Template
+
+```sql
+-- Core entity table template
+CREATE TABLE entities (
+    id              VARCHAR(36)   PRIMARY KEY,          -- UUID, not auto-increment
+    name            VARCHAR(255)  NOT NULL,
+    type            VARCHAR(50)   NOT NULL,             -- enum-like: use CHECK constraint
+    config          JSONB         NOT NULL DEFAULT '{}',-- flexible attributes, avoid over-normalization
+    status          VARCHAR(30)   NOT NULL DEFAULT 'ACTIVE',
+    created_by      VARCHAR(36)   NOT NULL,
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP     NOT NULL DEFAULT NOW(),
+    is_deleted      BOOLEAN       NOT NULL DEFAULT FALSE,
+    deleted_at      TIMESTAMP,                          -- NULL until soft-deleted
+    CONSTRAINT chk_type CHECK (type IN ('TYPE_A', 'TYPE_B', 'TYPE_C'))
+);
+
+-- Transaction / event table template (append-only)
+CREATE TABLE transactions (
+    id                  VARCHAR(36)   PRIMARY KEY,
+    entity_id           VARCHAR(36)   NOT NULL REFERENCES entities(id),
+    idempotency_key     VARCHAR(255)  NOT NULL,
+    status              VARCHAR(30)   NOT NULL DEFAULT 'PENDING',
+    -- PENDING | RUNNING | SUCCESS | FAILED
+    actor_id            VARCHAR(36),                   -- who triggered it (NULL = SYSTEM)
+    metadata            JSONB         NOT NULL DEFAULT '{}',
+    error_message       TEXT,
+    started_at          TIMESTAMP,
+    completed_at        TIMESTAMP,
+    created_at          TIMESTAMP     NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_idempotency UNIQUE (idempotency_key)
+);
+
+-- Audit log template (append-only, no FK on entity_id)
+CREATE TABLE audit_events (
+    id              VARCHAR(36)   PRIMARY KEY,
+    entity_id       VARCHAR(36)   NOT NULL,             -- plain VARCHAR, not FK
+    actor_id        VARCHAR(36),
+    actor_type      VARCHAR(20)   NOT NULL DEFAULT 'USER',  -- USER | SYSTEM
+    action          VARCHAR(50)   NOT NULL,
+    old_value       JSONB,
+    new_value       JSONB,
+    metadata        JSONB         NOT NULL DEFAULT '{}',
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
+    -- NOTE: No updated_at. Append-only — rows never mutated.
+);
+
+-- Config / rule table template
+CREATE TABLE rules (
+    id              VARCHAR(36)   PRIMARY KEY,
+    entity_id       VARCHAR(36)   NOT NULL REFERENCES entities(id),
+    rule_type       VARCHAR(50)   NOT NULL,
+    config          JSONB         NOT NULL DEFAULT '{}',  -- {threshold: 10.0, window: 60}
+    severity        VARCHAR(20)   NOT NULL DEFAULT 'ERROR',  -- ERROR | WARNING
+    is_active       BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+-- Result / output table template
+CREATE TABLE results (
+    id              VARCHAR(36)   PRIMARY KEY,
+    transaction_id  VARCHAR(36)   NOT NULL REFERENCES transactions(id),
+    rule_id         VARCHAR(36)   NOT NULL REFERENCES rules(id),
+    entity_id       VARCHAR(36)   NOT NULL,
+    passed          BOOLEAN       NOT NULL,
+    failure_reason  TEXT,
+    sample_ids      JSONB,                              -- array of up to 10 failed IDs
+    evaluated_at    TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+
+-- Junction table template (M:N)
+CREATE TABLE entity_handlers (
+    entity_id       VARCHAR(36)   NOT NULL REFERENCES entities(id),
+    handler_id      VARCHAR(36)   NOT NULL REFERENCES handlers(id),
+    PRIMARY KEY (entity_id, handler_id)
+);
+
+-- Index templates (always add these)
+CREATE INDEX idx_transactions_entity_status  ON transactions (entity_id, status);
+CREATE INDEX idx_transactions_entity_created ON transactions (entity_id, created_at DESC);
+CREATE INDEX idx_entities_status             ON entities (status) WHERE is_deleted = FALSE;
+CREATE INDEX idx_audit_entity_time           ON audit_events (entity_id, created_at DESC);
+CREATE INDEX idx_audit_actor                 ON audit_events (actor_id, created_at DESC) WHERE actor_id IS NOT NULL;
+-- Partial index: only rows matching a condition are indexed — keeps index small
+CREATE INDEX idx_rules_active                ON rules (entity_id, rule_type) WHERE is_active = TRUE;
+```
+
+---
+
+### DB Schema Checklist (Run Through Before Moving On)
+
+```
+□ Every table has: id (UUID), created_at, is it append-only or mutable?
+□ Mutable tables: updated_at column present?
+□ Entity tables: is_deleted + deleted_at for soft delete?
+□ Transaction tables: idempotency_key with UNIQUE constraint?
+□ Audit/event tables: no FK on entity_id (must survive entity deletion)?
+□ JSONB for flexible/polymorphic configs instead of over-normalizing?
+□ Indexes on: (entity_id, status), (entity_id, created_at DESC), partial WHERE clauses?
+□ CHECK constraints on enum-like string columns?
+□ Separate checkpoint table if cursor/watermark needed?
+```
+
+---
+
+### ER Diagram (Text Format — Draw This Inline)
+
+```
+entities            1 ──── N   transactions
+entities            1 ──── 1   entity_checkpoints    (cursor/watermark)
+entities            1 ──── N   rules
+transactions        1 ──── N   results
+results             N ──── 1   rules
+entities            N ──── M   handlers              (via entity_handlers junction)
+audit_events        N ──── 1   entities              (VARCHAR, no FK)
+```
+
+---
+
+### Senior-Level Phrases — DB Schema
+
+> "I use UUID primary keys instead of auto-increment integers — UUIDs are safe across distributed systems and never reveal record count."
+
+> "I store `source_config` as JSONB because connectors have 400+ types — fully normalizing every field would require 400 tables. JSONB gives flexibility with indexability."
+
+> "The `idempotency_key` UNIQUE constraint is my first line of defense against duplicate writes — before any application-level check even runs."
+
+> "I don't put a FK on `audit_events.entity_id` because audit logs must outlive the entity they describe. A FK would block deletion or cascade-delete the audit trail."
+
+> "I use a partial index `WHERE is_deleted = FALSE` — only active records are in the index, so it stays compact and fast even as the table grows."
+
+---
+
+## STEP 4 — REST API DESIGN (4–5 min)
+
+Say: *"Now let me define the API contract. This is what clients use to interact with the system."*
+
+---
+
+### REST API Design Principles — Say These Explicitly
+
+**RESTful resource naming:**
+> "Resources are nouns, not verbs. `/orders/{id}/cancel` not `/cancelOrder`. Sub-resources model ownership: `/connectors/{id}/jobs` not `/getJobsByConnector`."
+
+**Async vs sync response codes:**
+> "Sync operations (reads, updates) → 200. Resource creation → 201. Async operations (triggering a job, resync) → 202 Accepted. The client polls for status."
+
+**Cursor-based pagination on all list endpoints:**
+> "I use cursor-based pagination, not offset. Offset pagination degrades at scale — if 1000 rows are inserted between page 1 and page 2, offset skips rows. Cursor is stable."
+
+**Idempotency header on mutating POSTs:**
+> "POST endpoints that trigger state changes accept an optional `Idempotency-Key` header. Same key within 24h returns the cached response — no duplicate job creation."
+
+**Consistent error envelope:**
+> "All errors return a consistent JSON envelope: `{error_code, message, details}`. Clients can programmatically handle error codes without parsing message strings."
+
+---
+
+### HTTP Status Code Reference
+
+| Code | When to Use |
+|---|---|
+| `200 OK` | Successful read, synchronous update |
+| `201 Created` | Resource successfully created |
+| `202 Accepted` | Async operation triggered (job, sync, resync) |
+| `204 No Content` | Successful delete (idempotent — also return 204 for already-deleted) |
+| `400 Bad Request` | Malformed JSON, missing required field |
+| `401 Unauthorized` | Missing or invalid auth token |
+| `403 Forbidden` | Authenticated but not permitted |
+| `404 Not Found` | Resource doesn't exist |
+| `409 Conflict` | Duplicate unique resource, operation already running |
+| `422 Unprocessable Entity` | Semantically invalid (invalid state transition, bad enum value) |
+| `429 Too Many Requests` | Rate limit hit |
+| `500 Internal Server Error` | Unexpected failure |
+
+---
+
+### API Endpoint Template
+
+```
+HTTP_METHOD /resource-path
+[Headers]
+
+Request Body (if applicable):
+{
+  "field": "value"
+}
+
+Response STATUS:
+{
+  "field": "value"
+}
+
+Errors:
+  4XX Code    → When this error fires and why
+```
+
+---
+
+### Full API Design Example — Order Management
+
+**Create an order**
+```
+POST /orders
+Content-Type: application/json
+Idempotency-Key: <client-generated UUID>
+
+Request:
+{
+  "user_id": "usr-abc123",
+  "items": [
+    { "product_id": "prod-001", "quantity": 2 },
+    { "product_id": "prod-002", "quantity": 1 }
+  ],
+  "payment_method": "CREDIT_CARD",
+  "address_id": "addr-xyz"
+}
+
+Response 201 Created:
+{
+  "id": "ord-001",
+  "user_id": "usr-abc123",
+  "status": "PENDING",
+  "total_amount": 149.99,
+  "created_at": "2025-01-15T10:00:00Z"
+}
+
+Errors:
+  400 Bad Request       → items is empty or malformed
+  404 Not Found         → product_id or address_id not found
+  409 Conflict          → Idempotency-Key already used (same order, return cached response)
+  422 Unprocessable     → product out of stock
+```
+
+---
+
+**Get order details**
+```
+GET /orders/{order_id}
+
+Response 200:
+{
+  "id": "ord-001",
+  "user_id": "usr-abc123",
+  "status": "CONFIRMED",
+  "items": [
+    { "product_id": "prod-001", "name": "Widget A", "quantity": 2, "unit_price": 49.99 }
+  ],
+  "total_amount": 149.99,
+  "payment": { "method": "CREDIT_CARD", "status": "CAPTURED" },
+  "created_at": "2025-01-15T10:00:00Z",
+  "updated_at": "2025-01-15T10:01:00Z"
+}
+
+Errors:
+  404 Not Found         → order_id not found or does not belong to caller
+```
+
+---
+
+**List orders (cursor-paginated)**
+```
+GET /users/{user_id}/orders?status=CONFIRMED&limit=20&cursor=<next_cursor>
+
+Response 200:
+{
+  "items": [ { ...order objects... } ],
+  "next_cursor": "eyJpZCI6Im9yZC0wMDEifQ==",  // base64 of last seen id + sort field
+  "has_more": true,
+  "total_count": 142                            // optional: expensive, skip for large datasets
+}
+
+Query params:
+  status     = filter by OrderStatus enum value
+  limit      = page size, default 20, max 100
+  cursor     = opaque string from previous response's next_cursor
+```
+
+---
+
+**Cancel an order**
+```
+POST /orders/{order_id}/cancel
+Content-Type: application/json
+
+Request:
+{
+  "reason": "Changed my mind"   // optional
+}
+
+Response 200:
+{
+  "id": "ord-001",
+  "status": "CANCELLED",
+  "cancelled_at": "2025-01-15T10:05:00Z"
+}
+
+Errors:
+  404 Not Found         → order not found
+  422 Unprocessable     → order status is not PENDING (can only cancel PENDING orders)
+```
+
+---
+
+**Trigger async operation (e.g., reprocess order)**
+```
+POST /orders/{order_id}/reprocess
+Content-Type: application/json
+Idempotency-Key: <UUID>
+
+Response 202 Accepted:
+{
+  "job_id": "job-xyz789",
+  "order_id": "ord-001",
+  "status": "PENDING",
+  "created_at": "2025-01-15T10:05:00Z"
+}
+
+Note: Returns 202, not 200. Client polls GET /orders/{id} or GET /jobs/{job_id}.
+
+Errors:
+  409 Conflict          → a reprocess job is already RUNNING for this order
+```
+
+---
+
+**Delete a resource (soft delete)**
+```
+DELETE /orders/{order_id}
+
+Response 204 No Content
+
+Note: Idempotent — deleting an already-deleted resource also returns 204.
+```
+
+---
+
+### Pagination Design — Cursor vs Offset
+
+```
+CURSOR-BASED (preferred for production):
+
+  First request:  GET /orders?limit=20
+  Response:       { items: [...], next_cursor: "abc123", has_more: true }
+  Next request:   GET /orders?limit=20&cursor=abc123
+
+  How cursor is built:
+    cursor = base64(JSON.stringify({ id: lastItem.id, created_at: lastItem.created_at }))
+
+  SQL query:
+    WHERE (created_at, id) < (:lastCreatedAt, :lastId)   -- keyset pagination
+    ORDER BY created_at DESC, id DESC
+    LIMIT :limit + 1  -- fetch one extra to determine has_more
+
+OFFSET-BASED (only for small, stable datasets):
+
+  GET /items?page=2&page_size=20
+  SQL: LIMIT 20 OFFSET 40
+  Problem: if rows inserted between pages, data shifts — rows skipped or duplicated
+```
+
+---
+
+### Error Response Envelope (Consistent Across All Endpoints)
+
+```json
+{
+  "error": {
+    "code": "ORDER_ALREADY_CANCELLED",
+    "message": "Cannot cancel an order that is already in CANCELLED state.",
+    "details": {
+      "order_id": "ord-001",
+      "current_status": "CANCELLED"
+    },
+    "request_id": "req-abc123",
+    "timestamp": "2025-01-15T10:05:32Z"
+  }
+}
+```
+
+---
+
+### API Design Checklist (Run Through Before Moving On)
+
+```
+□ Resource names are nouns, not verbs?
+□ Hierarchy is correct? Sub-resources under parent? (/connectors/{id}/jobs)
+□ POST for create, GET for read, PUT/PATCH for update, DELETE for delete?
+□ Async operations return 202, not 200?
+□ All list endpoints paginated with cursor?
+□ Idempotency-Key header on state-mutating POSTs?
+□ Soft deletes return 204 (idempotent)?
+□ Error responses use consistent envelope with error_code?
+□ Status codes correct for each scenario?
+□ Request/response payloads defined with field names and types?
+```
+
+---
+
+### Senior-Level Phrases — API Design
+
+> "I return 202 for sync triggers because the job runs asynchronously — the client should not block waiting. They poll the job status endpoint."
+
+> "My list endpoints use cursor-based pagination. Offset pagination is broken at scale — rows inserted between requests cause skips. Cursor gives a stable snapshot."
+
+> "I accept an `Idempotency-Key` header on this POST. If the client retries due to a network timeout, the second request gets the same response as the first — no duplicate order created."
+
+> "DELETE is idempotent by design — deleting an already-deleted resource returns 204, not 404. This prevents client retry logic from blowing up."
+
+> "I use 422 Unprocessable Entity for business rule violations — not 400. The request is syntactically valid JSON, but semantically it violates a constraint."
+
+---
+
+## STEP 5 — CLASS DIAGRAM (3–4 min)
+
+Say: *"Now let me model the core entities and their relationships in Java class structure."*
+
+### Class Diagram Notation (Text Format)
 
 ```
 +----------------------------+
@@ -192,7 +597,6 @@ Say: *"Let me model the core entities and their relationships."*
 +----------------------------+
 | + publicMethod(): ReturnType|
 | - privateMethod(): void    |
-| + staticMethod(): Type     |
 +----------------------------+
 
 <<interface>>
@@ -210,138 +614,71 @@ Say: *"Let me model the core entities and their relationships."*
 | # sharedField: Type        |
 +----------------------------+
 | + concreteMethod(): void   |
-| + abstractMethod(): void   |  ← italicize or mark (abstract)
+| + abstractMethod(): void   |
 +----------------------------+
 ```
 
-### Relationship Notation (Draw on Whiteboard / Write in Text)
+### Relationship Notation
 
 ```
 Association      A ————————> B        A has a reference to B
-Dependency       A - - - - > B        A uses B temporarily
-Aggregation      A <>———————> B       A has B, B can exist alone   (hollow diamond)
-Composition      A <◆>——————> B       A owns B, B cannot exist alone (filled diamond)
-Inheritance      A ————————|> B       A extends B                  (hollow arrow)
-Implementation   A - - - - |> B       A implements B               (dashed hollow arrow)
+Aggregation      A <>———————> B       A has B, B can exist alone
+Composition      A <◆>——————> B       A owns B, B cannot exist alone
+Inheritance      A ————————|> B       A extends B
+Implementation   A - - - - |> B       A implements B
 ```
 
-### What to Include in Every Class Diagram
+### Relationship Decision (30 Second Rule)
 
-For EVERY class/interface/abstract class, write:
-- Fields with type and visibility (`+`, `-`, `#`)
-- Methods with parameters and return types
-- Stereotypes: `<<interface>>`, `<<abstract>>`, `<<enum>>`, `<<singleton>>`
-- Static members: underline or mark `static`
+```
+Shared contract, unrelated classes  ──> Interface
+Shared state + behavior, related    ──> Abstract Class
+Has-a, independent lifecycle        ──> Aggregation (field reference)
+Has-a, dependent lifecycle          ──> Composition (create inside)
+Pluggable algorithm                 ──> Strategy Pattern
+```
 
 ---
 
-## STEP 3 — DRAW SEQUENCE DIAGRAM (2–3 min, if asked or if flow is complex)
+## STEP 6 — SEQUENCE DIAGRAM (2–3 min, if flow is complex)
 
-Say: *"Let me trace the flow for the primary use case."*
-
-### Sequence Diagram Notation (Text Format)
+Say: *"Let me trace the primary use case end to end."*
 
 ```
-Client          Controller                Service                Repository            External
-  |                 |                        |                        |                    |
-  |-- POST /api/v1/kyc ------------------->|                        |                    |
-  |   (Create KYC Request)                |                        |                    |
-  |                 |-- validate() ------>|                        |                    |
-  |                 |                     |-- GET /kyc/{id} ------>|                    |
-  |                 |                     |                        |-- query() -------->|
-  |                 |                     |                        |<-- result ---------|
-  |                 |                     |<-- entity -------------|                    |
-  |                 |                     |-- GET /external/user/{id} ----------------->|
-  |                 |                     |<---------------------- external data -------|
-  |                 |                     |-- process()            |                    |
-  |                 |                     |-- PUT /kyc/{id} ------>|                    |
-  |                 |                     |                        |-- save() ----------|
-  |                 |<-- response --------|                        |                    |
-  |<-- 201 Created --|                    |                        |                    |
-```
+Client          Controller                Service                Repository
+  |                 |                        |                        |
+  |-- POST /orders -->                       |                        |
+  |                 |-- validate() ------->  |                        |
+  |                 |                        |-- findById() -------> |
+  |                 |                        |<-- entity ------------|
+  |                 |                        |-- save() -----------> |
+  |                 |<-- response ---------- |                        |
+  |<-- 201 Created -|                        |                        |
 
-### Rules for Sequence Diagram
-
-- Left to right: Client → Controller → Service → Repository → External
-- Show return arrows (dashed or labeled)
-- Show alternate flows with `[alt]` / `[opt]` blocks:
-
-```
-[alt: item found]
-  Service ——> Repository: findById()
-  Repository ——> Service: Item
-[else: item not found]
-  Service ——> Client: throw ItemNotFoundException
-[end]
-```
-
-- Show loops:
-```
-[loop: for each item in cart]
-  Service ——> PricingService: calculatePrice(item)
+[alt: product out of stock]
+  |                 |                        |-- throw OutOfStockException
+  |<-- 422 ---------|
 [end]
 ```
 
 ---
 
-## STEP 4 — DEFINE RELATIONSHIPS (2 min)
-
-Say: *"Let me define the relationships before writing code."*
-
-### Decision Tree — What to Use When
-
-```
-Need shared CONTRACT across unrelated classes?
-  └──> INTERFACE
-       Example: Payable, Notifiable, Searchable
-
-Need shared STATE + BEHAVIOR with variation?
-  └──> ABSTRACT CLASS
-       Example: Vehicle, Employee, Shape
-
-Need to REUSE behavior without IS-A relationship?
-  └──> COMPOSITION (has-a)
-       Example: OrderService has-a PaymentGateway
-
-Need IS-A with full override?
-  └──> INHERITANCE (extends)
-       Example: CreditCard extends Card
-
-Need pluggable ALGORITHMS?
-  └──> STRATEGY PATTERN (interface + implementations)
-
-Need to create objects without specifying class?
-  └──> FACTORY PATTERN
-```
-
-### Senior-Level Phrases — Relationships
-
-> "I use an **interface** here because multiple unrelated classes need this capability, allowing plug-and-play implementations."
-
-> "I use an **abstract class** because these entities share common state and behavior — the base handles the what, subclasses handle the how."
-
-> "I prefer **composition over inheritance** here to avoid tight coupling. If I inherit, I'm locked into a hierarchy. Composition gives me flexibility."
-
-> "This is a **has-a** relationship, not an **is-a**, so I compose rather than extend."
-
----
-
-## STEP 5 — FOLDER STRUCTURE (1 min, say this first before writing code)
+## STEP 7 — FOLDER STRUCTURE (1 min)
 
 Say: *"Let me lay out the package structure before writing any code."*
 
 ```
 project-name/
 └── src/main/java/com/example/
-    ├── model/                  ← Plain entities (fields, getters, setters, equals, hashCode)
+    ├── model/                  ← Plain entities (fields, getters, setters)
     ├── enums/                  ← Status, Type, Category enums
-    ├── interfaces/             ← Capability contracts (Payable, Notifiable, etc.)
+    ├── interfaces/             ← Capability contracts (Payable, Notifiable)
     ├── service/                ← Core business logic
     ├── strategy/               ← Strategy pattern implementations
     ├── factory/                ← Factory / Abstract Factory classes
     ├── observer/               ← Observer pattern (EventListener, EventPublisher)
-    ├── state/                  ← State pattern (if lifecycle management needed)
-    ├── repository/             ← In-memory storage (HashMap / ConcurrentHashMap)
+    ├── state/                  ← State pattern (lifecycle management)
+    ├── repository/             ← In-memory storage (ConcurrentHashMap)
     ├── controller/             ← Entry point, delegates to service
     ├── exception/              ← Custom exception hierarchy
     └── Application.java        ← main(), demo, test scenarios
@@ -349,59 +686,16 @@ project-name/
 
 ---
 
-## STEP 6 — WRITE CORE CODE (5–8 min)
+## STEP 8 — WRITE CORE CODE (5–8 min)
 
-### Code Comment Style — MANDATORY
-
-Every non-trivial class/method needs a comment block:
+### Mandatory Comment Style
 
 ```java
 /*
- * [Pattern/Principle]: Strategy Pattern
- * [Why]: So we can swap pricing algorithms at runtime
- *        without modifying OrderService.
+ * [Pattern]: Strategy Pattern
+ * [Why]: Swap pricing algorithms at runtime without modifying OrderService.
  * [Principle]: OCP — Open for extension, closed for modification.
  */
-```
-
-### File Template — Every File Must Have
-
-```java
-package com.example.service;
-
-/**
- * What it does: Processes orders end to end.
- * Why it exists: Central coordination point — keeps Controller thin.
- * Pattern: Follows SRP — only order processing logic here.
- */
-public class OrderService {
-
-    // Fields — explain why each exists
-    private final PaymentStrategy paymentStrategy;   // Strategy pattern — pluggable payment
-    private final Map<String, Order> orderStore;     // ConcurrentHashMap for thread safety
-
-    // Constructor injection — DIP: depend on abstraction, not concrete class
-    public OrderService(PaymentStrategy paymentStrategy) {
-        this.paymentStrategy = paymentStrategy;
-        this.orderStore = new ConcurrentHashMap<>();
-    }
-
-    public Order placeOrder(String userId, List<Item> items) {
-        // Step 1: Validate inputs
-        validateInput(userId, items);
-
-        // Step 2: Build order (Builder pattern if complex)
-        Order order = new Order(UUID.randomUUID().toString(), userId, items, OrderStatus.PENDING);
-
-        // Step 3: Process payment
-        paymentStrategy.pay(order.getTotalAmount());
-
-        // Step 4: Persist
-        orderStore.put(order.getId(), order);
-
-        return order;
-    }
-}
 ```
 
 ### Model Template
@@ -413,62 +707,39 @@ public class Order {
     private List<Item> items;
     private OrderStatus status;       // mutable — lifecycle changes
     private final LocalDateTime createdAt;
-
     // Constructor, getters, equals(), hashCode(), toString()
 }
 ```
 
-### Enum Template
+### Service Template
 
 ```java
-public enum OrderStatus {
-    PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-}
-```
+public class OrderService {
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
-### Interface Template
+    private final PaymentStrategy paymentStrategy;    // Strategy pattern
+    private final Map<String, Order> orderStore;      // ConcurrentHashMap for thread safety
 
-```java
-/*
- * Capability contract — any class that can process payments implements this.
- * Allows swapping Credit, UPI, Wallet without touching OrderService.
- */
-public interface PaymentStrategy {
-    void pay(double amount);
-    String getPaymentMode();
-}
-```
-
-### Abstract Class Template
-
-```java
-/*
- * Abstract class — all notification channels share senderId + timestamp logic.
- * Subclasses only implement the channel-specific send().
- */
-public abstract class Notification {
-    protected final String senderId;
-    protected final LocalDateTime timestamp;
-
-    protected Notification(String senderId) {
-        this.senderId = senderId;
-        this.timestamp = LocalDateTime.now();
+    // Constructor injection — DIP: depend on abstraction
+    public OrderService(PaymentStrategy paymentStrategy) {
+        this.paymentStrategy = paymentStrategy;
+        this.orderStore = new ConcurrentHashMap<>();
     }
 
-    // Common behavior
-    public void log() {
-        System.out.println("[" + timestamp + "] Notification from " + senderId);
+    public Order placeOrder(String userId, List<Item> items) {
+        validateInput(userId, items);                                    // Step 1: Validate
+        Order order = new Order(UUID.randomUUID().toString(), userId, items, OrderStatus.PENDING);
+        paymentStrategy.pay(order.getTotalAmount());                     // Step 2: Process
+        orderStore.put(order.getId(), order);                           // Step 3: Persist
+        log.info("Order placed | orderId={} userId={}", order.getId(), userId);
+        return order;
     }
-
-    // Subclasses must implement
-    public abstract void send(String message);
 }
 ```
 
-### Custom Exception Hierarchy Template
+### Custom Exception Hierarchy
 
 ```java
-// Base exception — callers can catch at right granularity
 public class AppException extends RuntimeException {
     private final String errorCode;
     public AppException(String errorCode, String message) {
@@ -476,31 +747,21 @@ public class AppException extends RuntimeException {
         this.errorCode = errorCode;
     }
 }
-
 public class ItemNotFoundException extends AppException {
     public ItemNotFoundException(String itemId) {
         super("ITEM_NOT_FOUND", "Item not found: " + itemId);
     }
 }
-
-public class InsufficientBalanceException extends AppException {
-    public InsufficientBalanceException(double required, double available) {
-        super("INSUFFICIENT_BALANCE",
-              "Required: " + required + ", Available: " + available);
-    }
-}
-
 public class InvalidStateException extends AppException {
     public InvalidStateException(String currentState, String operation) {
-        super("INVALID_STATE",
-              "Cannot perform " + operation + " in state: " + currentState);
+        super("INVALID_STATE", "Cannot perform " + operation + " in state: " + currentState);
     }
 }
 ```
 
 ---
 
-## STEP 7 — CONCURRENCY (CRITICAL FOR ADOBE / KOTAK)
+## STEP 9 — CONCURRENCY (CRITICAL)
 
 Say: *"Since multiple requests can hit this simultaneously, let me ensure thread safety."*
 
@@ -508,81 +769,74 @@ Say: *"Since multiple requests can hit this simultaneously, let me ensure thread
 
 | Tool | When to Use |
 |---|---|
-| `ConcurrentHashMap` | Thread-safe map, no full lock needed |
-| `synchronized` block | Simple mutual exclusion on a small critical section |
+| `ConcurrentHashMap` | Thread-safe map, segment-level locking |
+| `synchronized` block | Simple mutual exclusion on critical section |
 | `ReentrantLock` | Need tryLock, fairness, or lock across methods |
-| `AtomicInteger` / `AtomicLong` | Counter increments without synchronized |
+| `AtomicInteger / AtomicLong` | Counter increments without synchronized |
 | `AtomicReference<T>` | CAS on a single object reference |
 | `volatile` | Single variable visibility across threads |
-| `ReadWriteLock` | Read-heavy workload — multiple readers, exclusive writer |
-| `Semaphore` | Limit concurrent access (e.g., max 10 concurrent bookings) |
+| `ReadWriteLock` | Read-heavy: multiple concurrent readers, exclusive writer |
+| `Semaphore` | Limit concurrent access (max N concurrent bookings) |
 | `BlockingQueue` | Producer-consumer pattern |
+| `CopyOnWriteArrayList` | List that is iterated frequently, written rarely |
 
 ### Code Patterns
 
 ```java
-// CAS with AtomicInteger
-AtomicInteger seatCount = new AtomicInteger(100);
-boolean booked = seatCount.compareAndSet(currentVal, currentVal - 1);
-
-// Synchronized critical section
-public synchronized boolean bookSeat(String seatId) {
-    if (!availableSeats.contains(seatId)) throw new SeatUnavailableException(seatId);
-    availableSeats.remove(seatId);
-    bookedSeats.put(seatId, userId);
-    return true;
-}
-
-// ReentrantLock for fine-grained control
-private final ReentrantLock lock = new ReentrantLock();
-
-public void transfer(Account from, Account to, double amount) {
-    lock.lock();
-    try {
-        from.debit(amount);
-        to.credit(amount);
-    } finally {
-        lock.unlock();   // always in finally
-    }
-}
-
 // Idempotency check
-private final Set<String> processedRequestIds = ConcurrentHashMap.newKeySet();
-
-public void process(String requestId, Order order) {
-    if (!processedRequestIds.add(requestId)) {
-        return;  // duplicate — already processed
-    }
+private final Set<String> processedIds = ConcurrentHashMap.newKeySet();
+public void process(String requestId) {
+    if (!processedIds.add(requestId)) return;  // duplicate — skip
     // actual processing
+}
+
+// ReentrantLock with fairness (prevents starvation)
+private final ReentrantLock lock = new ReentrantLock(true);  // fair=true
+public void criticalSection() {
+    lock.lock();
+    try { /* ... */ } finally { lock.unlock(); }
+}
+
+// AtomicInteger CAS
+AtomicInteger count = new AtomicInteger(100);
+boolean reserved = count.compareAndSet(currentVal, currentVal - 1);
+
+// ReadWriteLock (autocomplete, search history)
+private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+public List<Item> read() {
+    rwLock.readLock().lock();
+    try { return new ArrayList<>(items); } finally { rwLock.readLock().unlock(); }
+}
+public void write(Item item) {
+    rwLock.writeLock().lock();
+    try { items.add(item); } finally { rwLock.writeLock().unlock(); }
 }
 ```
 
-### Senior-Level Phrase — Concurrency
+### Senior-Level Phrases — Concurrency
 
-> "I use ConcurrentHashMap instead of HashMap because multiple threads will read and write simultaneously — ConcurrentHashMap gives us segment-level locking without blocking the entire map."
+> "I use ConcurrentHashMap instead of HashMap because multiple threads will read and write simultaneously — segment-level locking without blocking the entire map."
 
-> "I use AtomicInteger with CAS here to avoid a synchronized block on the counter — it's lock-free and more performant under high contention."
+> "I use AtomicInteger with CAS here to avoid a synchronized block on the counter — lock-free and more performant under high contention."
 
-> "I add an idempotency check using a ConcurrentHashMap key set — if the same requestId comes twice, we return early without double-processing."
+> "I use ReadWriteLock because this is read-heavy — autocomplete is called on every keystroke, writes happen only on explicit search. Concurrent reads don't block each other."
 
 ---
 
-## STEP 8 — DESIGN PATTERNS (USE WHEN NEEDED)
-
-Call out the pattern BY NAME and explain WHY.
+## STEP 10 — DESIGN PATTERNS (CALL OUT BY NAME)
 
 | Pattern | Use When | Senior Phrase |
 |---|---|---|
 | **Strategy** | Multiple algorithms, interchangeable at runtime | "I use Strategy so I can swap logic without touching the service class." |
-| **Factory** | Object creation logic is complex or varies | "I use Factory to centralize creation and hide the `new` keyword from callers." |
-| **Builder** | Object has many optional fields | "Builder pattern prevents telescoping constructors and makes construction readable." |
-| **Singleton** | Global config, registry, thread pool | "I use Singleton for the config manager — one instance, globally accessible." |
-| **Observer** | Event notifications to multiple subscribers | "Observer decouples the event source from handlers — add/remove listeners without touching core logic." |
-| **State** | Entity has lifecycle (PENDING → CONFIRMED → etc.) | "State pattern externalizes lifecycle transitions — each state knows what's allowed." |
-| **Decorator** | Add behavior without modifying class | "Decorator wraps the base service and adds cross-cutting concerns like logging or rate-limiting." |
-| **Template Method** | Algorithm skeleton, steps vary | "Template Method defines the flow in the abstract class — subclasses plug in the specifics." |
+| **Factory** | Object creation logic is complex or varies | "Factory centralizes creation and hides `new` from callers." |
+| **Builder** | Object has many optional fields | "Builder prevents telescoping constructors." |
+| **Singleton** | Global config, registry, thread pool | "One instance, globally accessible — initialized once." |
+| **Observer** | Event notifications to multiple subscribers | "Observer decouples event source from handlers." |
+| **State** | Entity has lifecycle (PENDING → CONFIRMED → etc.) | "State pattern externalizes lifecycle — each state knows what's allowed." |
+| **Decorator** | Add behavior without modifying class | "Decorator wraps the base and adds cross-cutting concerns." |
+| **Template Method** | Algorithm skeleton, steps vary | "Template Method defines the flow; subclasses plug in specifics." |
 
-### State Pattern Template (Common in LLD)
+### State Pattern Template
 
 ```java
 public interface OrderState {
@@ -590,102 +844,84 @@ public interface OrderState {
     void ship(OrderContext ctx);
     void cancel(OrderContext ctx);
 }
-
 public class PendingState implements OrderState {
-    public void confirm(OrderContext ctx) {
-        ctx.setState(new ConfirmedState());
-    }
-    public void ship(OrderContext ctx) {
-        throw new InvalidStateException("PENDING", "ship");
-    }
-    public void cancel(OrderContext ctx) {
-        ctx.setState(new CancelledState());
-    }
+    public void confirm(OrderContext ctx) { ctx.setState(new ConfirmedState()); }
+    public void ship(OrderContext ctx)    { throw new InvalidStateException("PENDING", "ship"); }
+    public void cancel(OrderContext ctx)  { ctx.setState(new CancelledState()); }
 }
-
 public class OrderContext {
-    private OrderState currentState = new PendingState();
-
-    public void setState(OrderState state) { this.currentState = state; }
-    public void confirm() { currentState.confirm(this); }
-    public void ship()    { currentState.ship(this); }
-    public void cancel()  { currentState.cancel(this); }
+    private OrderState state = new PendingState();
+    public void setState(OrderState s) { this.state = s; }
+    public void confirm() { state.confirm(this); }
+    public void cancel()  { state.cancel(this); }
 }
 ```
 
 ---
 
-## STEP 9 — DESIGN PRINCIPLES (ALWAYS MENTION AT LEAST 2)
+## STEP 11 — DESIGN PRINCIPLES (MENTION AT LEAST 2)
 
 Say: *"Let me call out the SOLID principles I'm applying."*
 
 | Principle | What to Say |
 |---|---|
-| **SRP** | "Each class has one reason to change — OrderService only handles order logic, PaymentService only handles payment." |
+| **SRP** | "Each class has one reason to change — OrderService only handles order logic." |
 | **OCP** | "I can add a new payment type by implementing PaymentStrategy — no existing code changes." |
 | **LSP** | "Any subclass of Notification can replace the base without breaking behavior." |
 | **ISP** | "I split the interface into Payable and Refundable — callers depend only on what they use." |
-| **DIP** | "OrderService depends on PaymentStrategy interface, not CreditCardPayment — high-level modules don't depend on low-level." |
-| **Composition over Inheritance** | "I compose OrderService with a PaymentStrategy rather than extending a base payment class." |
-| **Encapsulation** | "All fields are private — state changes only through validated methods." |
-| **Fail Fast** | "I validate at entry points so invalid state never propagates deep into the system." |
+| **DIP** | "OrderService depends on PaymentStrategy interface, not CreditCardPayment." |
+| **Composition over Inheritance** | "I compose OrderService with PaymentStrategy rather than extending a base payment class." |
+| **Fail Fast** | "I validate at entry points so invalid state never propagates deep." |
 
 ---
 
-## STEP 10 — EDGE CASE CHECKLIST (Before Finishing)
+## STEP 12 — EDGE CASE CHECKLIST
 
 Say: *"Let me quickly validate the failure scenarios."*
-
-Go through this list out loud:
 
 ```
 □ Null inputs — null userId, null item list?
 □ Empty collections — empty cart, zero items?
 □ Negative / zero values — negative price, zero quantity?
-□ Duplicate requests — same order placed twice?
+□ Duplicate requests — same order placed twice? (idempotency key)
 □ Concurrent access — two threads booking same seat?
 □ Invalid state transition — shipping a cancelled order?
 □ Max limits exceeded — cart limit, rate limit, booking cap?
 □ External service failure — payment gateway down?
 □ Partial failure — one item fails, what happens to rest?
 □ Resource exhaustion — out of stock, no available rooms?
+□ Idempotent deletes — deleting already-deleted resource?
+□ Pagination edge — cursor points to deleted row?
+□ JSONB query — querying inside JSONB config field (need GIN index)?
 ```
 
 ---
 
-## STEP 11 — LOGGING (Add After Core Code)
+## STEP 13 — LOGGING (Add After Core Code)
 
-Say: *"I'll add structured logging — no sensitive data."*
+Say: *"I'll add structured logging — no sensitive data, all log lines include contextual IDs."*
 
 ```java
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
-public class OrderService {
-    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
-
-    public Order placeOrder(String userId, List<Item> items) {
-        String requestId = UUID.randomUUID().toString();
-        log.info("PlaceOrder started | requestId={} userId={} itemCount={}",
-                 requestId, userId, items.size());
-
-        try {
-            // ... logic ...
-            log.info("PlaceOrder success | requestId={} orderId={}", requestId, order.getId());
-            return order;
-        } catch (AppException e) {
-            log.error("PlaceOrder failed | requestId={} errorCode={} reason={}",
-                      requestId, e.getErrorCode(), e.getMessage());
-            throw e;
-        }
-        // NO: log.info("Card number: " + card.getNumber());  ← never log sensitive data
+public Order placeOrder(String userId, List<Item> items) {
+    String requestId = UUID.randomUUID().toString();
+    log.info("PlaceOrder started | requestId={} userId={} itemCount={}", requestId, userId, items.size());
+    try {
+        // ... logic ...
+        log.info("PlaceOrder success | requestId={} orderId={}", requestId, order.getId());
+        return order;
+    } catch (AppException e) {
+        log.error("PlaceOrder failed | requestId={} errorCode={} reason={}", requestId, e.getErrorCode(), e.getMessage());
+        throw e;
     }
+    // NEVER: log.info("Card: " + card.getNumber());
 }
 ```
 
 ---
 
-## STEP 12 — SCALING DISCUSSION (If Asked)
+## STEP 14 — SCALING DISCUSSION (If Asked)
 
 Say: *"If this needs to scale beyond a single JVM..."*
 
@@ -701,7 +937,7 @@ Client Request
     ▼
 [Service Layer]        ← Stateless, horizontally scalable
     │
-    ├──> [Cache Layer]     ← Redis — hot data, session, idempotency keys
+    ├──> [Cache Layer]     ← Redis — hot data, session, idempotency keys, cursor checkpoints
     │
     ├──> [Database]        ← Sharded / replicated — writes to primary, reads from replica
     │
@@ -711,31 +947,47 @@ Client Request
          [Workers]         ← Consumer groups, independent scaling
 ```
 
+**Production upgrades to mention for each component:**
+- `CheckpointStore` → Redis (survives restarts, shared across JVMs)
+- `ConnectorRegistry` → etcd or Consul (distributed coordination)
+- `ConcurrentHashMap` (in-memory) → PostgreSQL with row-level locking
+- `ExecutorService` (local) → Kafka topic + consumer group (distributed job queue)
+- `in-memory idempotency set` → Redis SET with TTL (distributed dedup)
+
 ---
 
 ## QUICK-REFERENCE CHEAT SHEET
+
+### Step Order at a Glance
+
+```
+1.  Clarify Requirements          → functional + non-functional
+2.  Entity Identification         → 4 archetypes + "what varies?"
+3.  DB Schema Design              → SQL DDL, indexes, constraints    ← NEW
+4.  REST API Design               → endpoints, status codes, pagination ← NEW
+5.  Class Diagram                 → UML text notation
+6.  Sequence Diagram              → primary use case flow
+7.  Folder Structure              → package layout
+8.  Core Code                     → entities, services, patterns
+9.  Concurrency                   → thread safety decisions
+10. Design Patterns               → named patterns with rationale
+11. Design Principles             → SOLID + composition
+12. Edge Cases                    → failure scenario checklist
+13. Logging                       → structured, no sensitive data
+14. Scaling                       → beyond single JVM
+```
 
 ### Opening Lines
 
 | Moment | What to Say |
 |---|---|
-| Start | "Before implementation, let me clarify a few requirements." |
-| Entities | "Let me identify core entities and model them." |
-| Relationships | "Let me define relationships before writing any code." |
-| Concurrency | "Since multiple requests can hit this simultaneously, I'll ensure thread safety using..." |
-| Review | "Let me quickly validate the edge cases." |
-| Refactor | "I'll start with a simple design and refactor using patterns if needed." |
-| Scale | "If this needs to go beyond single JVM, I'd add caching and a queue layer." |
-
-### Relationship Decision (30 Second Rule)
-
-```
-Shared contract, unrelated classes  ──> Interface
-Shared state + behavior, related    ──> Abstract Class
-Has-a, independent lifecycle        ──> Aggregation (field reference)
-Has-a, dependent lifecycle          ──> Composition (create inside)
-Pluggable algorithm                 ──> Strategy pattern
-```
+| Start | "Before implementation, let me clarify requirements — then I'll design the DB schema, then the API, then the Java classes." |
+| DB Schema | "I'll start with append-only for event tables, soft deletes for entities, and idempotency keys on writes." |
+| API Design | "I'll use RESTful nouns, 202 for async operations, cursor pagination on all list endpoints." |
+| Entities | "Let me model the core entities and their relationships." |
+| Concurrency | "Since multiple requests can hit this simultaneously, I'll use ConcurrentHashMap and AtomicLong for thread safety." |
+| Review | "Let me quickly validate the edge cases before finishing." |
+| Scale | "If this needs to go beyond single JVM, I'd move checkpoints to Redis, job queue to Kafka, and registry to etcd." |
 
 ### Concurrency Decision (30 Second Rule)
 
@@ -743,12 +995,43 @@ Pluggable algorithm                 ──> Strategy pattern
 Thread-safe map               ──> ConcurrentHashMap
 Simple counter                ──> AtomicInteger
 Lock with tryLock / fairness  ──> ReentrantLock
-Read-heavy                    ──> ReadWriteLock
+Read-heavy workload           ──> ReadWriteLock
 Limit parallel access         ──> Semaphore
 Producer-consumer             ──> BlockingQueue
-Prevent duplicate processing  ──> Idempotency key in ConcurrentHashMap
+Prevent duplicate processing  ──> Idempotency key in ConcurrentHashMap.newKeySet()
+Iteration-heavy list          ──> CopyOnWriteArrayList
+```
+
+### API Status Code Decision (30 Second Rule)
+
+```
+Successful read / sync update   ──> 200 OK
+Resource created                ──> 201 Created
+Async job triggered             ──> 202 Accepted
+Successful delete               ──> 204 No Content (idempotent)
+Malformed request               ──> 400 Bad Request
+Auth missing / invalid          ──> 401 Unauthorized
+Not permitted                   ──> 403 Forbidden
+Resource not found              ──> 404 Not Found
+Already exists / job running    ──> 409 Conflict
+Business rule violation         ──> 422 Unprocessable Entity
+Rate limit hit                  ──> 429 Too Many Requests
+```
+
+### DB Design Decision (30 Second Rule)
+
+```
+Mutable entity                  ──> updated_at + is_deleted + deleted_at
+Append-only event / log         ──> no updated_at, no FK on entity_id
+Transaction / job               ──> idempotency_key UNIQUE constraint
+Flexible polymorphic config     ──> JSONB column
+Cursor / watermark              ──> separate _checkpoints table
+Most frequent query pattern     ──> (entity_id, status) index
+History queries                 ──> (entity_id, created_at DESC) index
+Large table, filter by status   ──> partial index WHERE is_deleted = FALSE
 ```
 
 ---
 
 *End of Rulebook. Run every step. Call out every step name.*
+*Total steps: 14 | New additions: DB Schema (Step 3), REST API Design (Step 4)*
