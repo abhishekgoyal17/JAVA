@@ -1,0 +1,31 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+
+# Gradle/build outputs
+.gradle/
+build/
+**/build/
+**/bin/
+out/
+
+# Logs/temp
+*.log
+*.tmp
+*.swp
+
+# Archives generated during experiments
+*.zip
+*.tar
+*.tar.gz
+*.tgz
