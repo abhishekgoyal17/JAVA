@@ -1,7 +1,11 @@
 # Documentation Index
 
 ## Java Core
+- [Collections Framework](java-core/collections-framework.md)
+- [Generics and Type Erasure](java-core/generics-type-erasure.md)
+- [equals, hashCode, String Immutability and Wrapper Caching](java-core/equals-hashcode-string-immutability.md)
 - [Exception Handling](java-core/exception-handling.md)
+- [Java 8 to Java 21 Features](java-core/java-8-to-21-features.md)
 - [JIT Compiler](java-core/jit-compiler.md)
 - [Memory Management](java-core/memory-management.md)
 
