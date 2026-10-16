@@ -40,6 +40,9 @@ So the real pipeline is:
 
 ---
 
+LINKS
+1. https://youmind.com/opus-5-5-prompts
+
 ## Part 2 — Basic: Do It Yourself With Zero Setup
 
 You don't need Claude Code or any of the repos below to *try* this. You can do a rough version directly in a Claude chat with code execution / artifacts:
